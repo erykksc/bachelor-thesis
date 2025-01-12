@@ -1,0 +1,13 @@
+*.DS_Store
+
+# Expose
+expose/submissions/
+
+# Latex
+*.aux
+*.dvi
+*.fdb_latexmk
+*.fls
+*.log
+*.out
+*.synctex.gz
