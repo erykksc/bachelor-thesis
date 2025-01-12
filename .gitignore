@@ -2,6 +2,8 @@
 
 # Expose
 expose/submissions/
+expose/src/expose.pdf
+expose/src/resources/
 
 # Latex
 *.aux
