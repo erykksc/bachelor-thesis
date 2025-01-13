@@ -14,6 +14,9 @@
 % For inline enumerations
 \usepackage{enumitem}
 
+\usepackage{tikz}
+\usetikzlibrary{shapes,arrows,positioning,fit,backgrounds}
+
 \title{Evaluating the Vertical and Horizontal Read and Write Scalability of MobilityDB \\[1ex] \large Bachelor's Thesis Exposé}
 \author{Eryk Karol Kściuczyk}
 \date{} % This removes the date
@@ -38,12 +41,12 @@ Bakli, Sakr, and Zimanyi, "Distributed Mobility Data Management in MobilityDB," 
 % Problem Statement
 MobilityDB's distributed capabilities, enabled by integration with Citus, claim to enhance scalability.
 % TODO: try to shorten this section into one or two sentences mentioning the unexplored angles
-However, the platform's ability to efficiently scale read and write operations under real-world workloads has not been rigorously evaluated.
-Current research has primarily focused on optimizing read query performance,
-such as complex spatial and spatio-temporal queries. However, write throughput—critical for handling high-ingest
-workloads typical of IoT applications—remains underexplored, especially in scenarios involving concurrent writes
-across distributed nodes.
-Questions remain about latency, throughput, and scalability in vertical and horizontal configurations when handling realistic spatio-temporal datasets.
+However, the platform's ability to efficiently scale read and write operations under real-world workloads has not been rigorously
+evaluated as current research has primarily focused on optimizing and measuring read query performance.
+However, write throughput—critical for handling high-ingest workloads typical of IoT applications—remains underexplored,
+especially in scenarios involving concurrent writes across distributed nodes.
+Questions remain about latency, throughput, and scalability in vertical and horizontal configurations when handling
+realistic spatio-temporal datasets.
 
 % Solution Approach
 In this thesis we aim to benchmark the vertical and horizontal scalability regarding both read and write
@@ -57,9 +60,6 @@ Afterwards, we want to compare scalability trade-offs between vertical and horiz
 Benchmarking data will be generated using a custom data generation tool specifically developed for this study.
 The tool will simulate the movement and locations of birds, chosen due to their seasonal migration patterns,
 localized movements within standard habitats, varying flight heights and times.
-% TODO: To musch detail for an expose, (remove/shorten)
-Additionally, modeling different bird species will enable simulation of diverse flight altitudes, fly times and
-migration times, providing a robust dataset for spatio-temporal analysis.
 %
 We will compare the performance of MobilityDB combined with Citus on different hardware configurations using 
 Google Compute Engine service on Google Cloud Platform.
@@ -67,7 +67,73 @@ We will evaluate several scenarios, including vertically scaling a single node a
 
 \begin{figure}[ht]
     \centering
-    \includegraphics[width=0.8\textwidth]{./resources/benchmark-architecture.png}
+    \begin{tikzpicture}[
+        node distance=0.5cm,
+        box/.style={
+            rectangle,
+            draw,
+            text width=2.5cm,
+            minimum height=1cm,
+            align=center
+        },
+        client/.style={
+            box,
+            fill=blue!10,
+            draw=blue!70
+        },
+        coordinator/.style={
+            box,
+            fill=orange!10,
+            draw=orange!70,
+        },
+        worker/.style={
+            box,
+            fill=purple!10,
+            draw=purple!70
+        },
+        group/.style={
+            rectangle,
+            draw,
+            dashed,
+            inner sep=0.5cm
+        },
+        arrow/.style={
+            ->,
+            >=latex
+        }
+    ]
+    % Client components
+    \node[client] (db_client) {\textbf{DB Client}};
+    \node[client, below=of db_client] (datagen) {Bird Data Generator};
+    % Client connections
+    \draw[arrow] (datagen) -- (db_client);
+    % Coordinator node
+    \node[coordinator, right=5cm of db_client] (cn) {\textbf{Coordinator}\\PostgreSQL + MobilityDB + Citus};
+    % Worker nodes
+    \node[worker, below=1cm of cn] (w2) {\textbf{Worker 2}\\PostgreSQL + MobilityDB + Citus};
+    \node[worker, left=of w2] (w1) {\textbf{Worker 1}\\PostgreSQL + MobilityDB + Citus};
+    \node[worker, right=of w2] (w3) {\textbf{Worker N}\\PostgreSQL + MobilityDB + Citus};
+    % Connections to workers
+    \draw[arrow] (cn) -- (w1);
+    \draw[arrow] (cn) -- (w2);
+    \draw[arrow] (cn) -- (w3);
+    % Client to SUT connections
+    \draw[arrow] (db_client) to[bend left=8] node[above] {Queries/Writes} (cn);
+    \draw[arrow] (cn) to[bend left=8] node[below] {Results} (db_client);
+    
+    % Group boxes
+    \begin{pgfonlayer}{background}
+        \node[group, fit=(db_client) (datagen)] (client) {};
+        \node[above] at (client.north) {Benchmarking Client};
+    
+        \node[group, fit=(cn) (w1) (w2) (w3)] (sut) {};
+        \node[above] at (sut.north) {System Under Test (MobilityDB Cluster)};
+        
+        
+        % \node[group, fit=(cn)] (coordinator) {};
+        % \node[above] at (coordinator.north) {Coordinator Node};
+    \end{pgfonlayer}
+    \end{tikzpicture}
     \caption{
 	Architecture of the benchmarking setup. 
 	The benchmarking client generates synthetic bird movement data and executes the workload against 
