@@ -72,82 +72,82 @@ Afterwards, we will compare scalability trade-offs between those two
 approaches.
 
 \begin{figure}[ht]
-    \centering
-    \begin{tikzpicture}[
+	\centering
+	\begin{tikzpicture}[
 	font=\small,
-        node distance=0.5cm,
-        box/.style={
-            rectangle,
-            draw,
-            text width=2.5cm,
-            minimum height=1cm,
-            align=center
-        },
-        client/.style={
-            box,
-            fill=blue!10,
-            draw=blue!70
-        },
-        coordinator/.style={
-            box,
-            fill=orange!10,
-            draw=orange!70,
-        },
-        worker/.style={
-            box,
-            fill=purple!10,
-            draw=purple!70
-        },
-        group/.style={
-            rectangle,
-            draw,
-            dashed,
-            inner sep=0.2cm
-        },
-        arrow/.style={
-            ->,
-            >=latex
-        }
-    ]
-    % Client components
-    \node[client] (db_client) {\textbf{DB Client}};
-    \node[client, below=of db_client] (datagen) {Data Generator};
-    % Client connections
-    \draw[arrow] (datagen) -- (db_client);
-    % Coordinator node
-    \node[coordinator, right=5cm of db_client] (cn) {
-         \textbf{Coordinator}\\MobilityDB \\+ Citus};
-    % Worker nodes
-    \node[worker, below=of cn] (w2) {
-	    \textbf{Worker 2}\\MobilityDB \\+ Citus};
-    \node[worker, left=of w2] (w1) {
-	    \textbf{Worker 1}\\MobilityDB \\+ Citus};
-    \node[worker, right=of w2] (w3) {
-	    \textbf{Worker N}\\MobilityDB \\+ Citus};
-    % Connections to workers
-    \draw[arrow] (cn) -- (w1);
-    \draw[arrow] (cn) -- (w2);
-    \draw[arrow] (cn) -- (w3);
-    % Client to SUT connections
-    \draw[arrow] (db_client) to[bend left=8] node[above] {Queries/Writes} (cn);
-    \draw[arrow] (cn) to[bend left=8] node[below] {Results} (db_client);
-    
-    % Group boxes
-    \begin{pgfonlayer}{background}
-        \node[group, fit=(db_client) (datagen)] (client) {};
-        \node[above] at (client.north) {Benchmarking Client};
+		node distance=0.5cm,
+		box/.style={
+			rectangle,
+			draw,
+			text width=2.5cm,
+			minimum height=1cm,
+			align=center
+		},
+		client/.style={
+			box,
+			fill=blue!10,
+			draw=blue!70
+		},
+		coordinator/.style={
+			box,
+			fill=orange!10,
+			draw=orange!70,
+		},
+		worker/.style={
+			box,
+			fill=purple!10,
+			draw=purple!70
+		},
+		group/.style={
+			rectangle,
+			draw,
+			dashed,
+			inner sep=0.2cm
+		},
+		arrow/.style={
+			->,
+			>=latex
+		}
+	]
+	% Client components
+	\node[client] (db_client) {\textbf{DB Client}};
+	\node[client, below=of db_client] (datagen) {Data Generator};
+	% Client connections
+	\draw[arrow] (datagen) -- (db_client);
+	% Coordinator node
+	\node[coordinator, right=5cm of db_client] (cn) {
+		 \textbf{Coordinator}\\MobilityDB \\+ Citus};
+	% Worker nodes
+	\node[worker, below=of cn] (w2) {
+		\textbf{Worker 2}\\MobilityDB \\+ Citus};
+	\node[worker, left=of w2] (w1) {
+		\textbf{Worker 1}\\MobilityDB \\+ Citus};
+	\node[worker, right=of w2] (w3) {
+		\textbf{Worker N}\\MobilityDB \\+ Citus};
+	% Connections to workers
+	\draw[arrow] (cn) -- (w1);
+	\draw[arrow] (cn) -- (w2);
+	\draw[arrow] (cn) -- (w3);
+	% Client to SUT connections
+	\draw[arrow] (db_client) to[bend left=8] node[above] {Queries/Writes} (cn);
+	\draw[arrow] (cn) to[bend left=8] node[below] {Results} (db_client);
+	
+	% Group boxes
+	\begin{pgfonlayer}{background}
+		\node[group, fit=(db_client) (datagen)] (client) {};
+		\node[above] at (client.north) {Benchmarking Client};
 
-        \node[group, fit=(cn) (w1) (w2) (w3)] (sut) {};
-        \node[above] at (sut.north) {System Under Test (MobilityDB Cluster)};
-    \end{pgfonlayer}
-    \end{tikzpicture}
-    \caption{
+		\node[group, fit=(cn) (w1) (w2) (w3)] (sut) {};
+		\node[above] at (sut.north) {System Under Test (MobilityDB Cluster)};
+	\end{pgfonlayer}
+	\end{tikzpicture}
+	\caption{
 	Benchmarking client will write generated bird movement data and execute
 	the workload against System Under Test (MobilityDB cluster).
 	The cluster consists of a coordinator and multiple workers, each running
 	PostgreSQL with MobilityDB and Citus extensions. 
-    }
-    \label{fig:bench_setup}
+	}
+	\label{fig:bench_setup}
 \end{figure}
 
 % Analysis/ Evaluation
