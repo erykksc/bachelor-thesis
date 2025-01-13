@@ -33,27 +33,21 @@
 Spatio-temporal databases are increasing in popularity due to increased
 production of such data by numerous IoT devices.
 As the need for such databases increases, developers try to reach for 
-familiar  and open-source solutions.
+familiar and open-source solutions.
 MobilityDB, built on top of the spatial extension PostGIS, extends PostgreSQL's 
 capabilities regarding spatio-temporal aspects.
 Previous research has shown that the MobilityDB extension can be partially used
-in conjunction with Citus, a PosgreSQL extension, which provides horizontal
-scalability options.\footnote{
-M. Bakli, M. Sakr, and E. Zimanyi,
-"Distributed moving object data management in MobilityDB,"
-in Proc. 8th ACM SIGSPATIAL Int. Workshop on Analytics for Big Geospatial Data
-(BigSpatial '19), Chicago, IL, USA, 2019,
-pp. 1-10, doi: 10.1145/3356999.3365467.
-\label{footnote:mobilitydb}
-}
+in conjunction with Citus, a PostgreSQL extension, which provides horizontal
+scalability options.
+
 % Problem Statement
 While specific queries runtimes of BerlinMOD benchmark have been 
-evaluated on 4 and 28 node clusters\footref{footnote:mobilitydb},
+evaluated on 4 and 28 node clusters,
 horizontal and vertical scalability of the platform has not yet been fully
 explored, especially write performance.
 BerlinMOD queries are not designated for distributed MOD and different set of
 queries is required to further assess its performance.
-Moreover, testing with a wider range of cluster sizes is necessary to 
+Moreover, benchmarking with a wider range of cluster sizes is necessary to 
 establish the scalability pattern.
 
 % Solution Approach
@@ -61,19 +55,20 @@ In this thesis we aim to benchmark the vertical and horizontal scalability
 using generated spatio-temporal data to measure metrics like request 
 latency, query runtime, and read/write throughput under different data sizes.
 % Aspired Implementation
-Benchmarking data will be generated using a custom data generation tool
+We will generate data for the benchmark using a custom data generation tool
 specifically developed for this study.
 The tool will simulate the movement of birds, chosen due to their
 seasonal migration patterns, localized movements within standard habitats,
-varying flight heights and times. The testing setup can be seen on figure
-\ref{fig:test_setup}.
+varying flight heights and times. The benchmarking setup can be seen on figure
+\ref{fig:bench_setup}.
 %
 We will compare the performance of MobilityDB combined with Citus on different
 hardware configurations using Google Compute Engine service on Google Cloud
 Platform.
 Additionally, we will evaluate several scenarios, including vertically scaling 
-a single node and scaling out by distributing MobilityDB across several 
-Afterwards, we want to compare scalability trade-offs between those two
+a single node and scaling out by distributing MobilityDB across several
+instances. 
+Afterwards, we will compare scalability trade-offs between those two
 approaches.
 
 \begin{figure}[ht]
@@ -116,19 +111,19 @@ approaches.
     ]
     % Client components
     \node[client] (db_client) {\textbf{DB Client}};
-    \node[client, below=of db_client] (datagen) {Bird Data Generator};
+    \node[client, below=of db_client] (datagen) {Data Generator};
     % Client connections
     \draw[arrow] (datagen) -- (db_client);
     % Coordinator node
     \node[coordinator, right=5cm of db_client] (cn) {
-         \textbf{Coordinator}\\PostgreSQL \\+ MobilityDB \\+ Citus};
+         \textbf{Coordinator}\\MobilityDB \\+ Citus};
     % Worker nodes
     \node[worker, below=of cn] (w2) {
-	    \textbf{Worker 2}\\PostgreSQL \\+ MobilityDB \\+ Citus};
+	    \textbf{Worker 2}\\MobilityDB \\+ Citus};
     \node[worker, left=of w2] (w1) {
-	    \textbf{Worker 1}\\PostgreSQL \\+ MobilityDB \\+ Citus};
+	    \textbf{Worker 1}\\MobilityDB \\+ Citus};
     \node[worker, right=of w2] (w3) {
-	    \textbf{Worker N}\\PostgreSQL \\+ MobilityDB \\+ Citus};
+	    \textbf{Worker N}\\MobilityDB \\+ Citus};
     % Connections to workers
     \draw[arrow] (cn) -- (w1);
     \draw[arrow] (cn) -- (w2);
@@ -152,12 +147,12 @@ approaches.
 	The cluster consists of a coordinator and multiple workers, each running
 	PostgreSQL with MobilityDB and Citus extensions. 
     }
-    \label{fig:test_setup}
+    \label{fig:bench_setup}
 \end{figure}
 
 % Analysis/ Evaluation
 % TODO:
-Query latencies and throughput measurements will be analyzed using confidence
+We will measure query latencies and throughput using confidence
 intervals (95\% CI) to account for performance variability in distributed
 systems. 
 %
@@ -169,6 +164,6 @@ In order to validate the statistical significance of performance differences
 between vertical and horizontal scaling approaches, we will conduct paired
 t-tests where appropriate.
 %
-Each benchmark configuration will be run multiple times to ensure statistical
+We are going to run each benchmark configuration multiple times to ensure statistical
 reliability.
 \end{document}
