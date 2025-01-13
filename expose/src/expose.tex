@@ -12,6 +12,8 @@
 \usepackage{graphicx}
 \usepackage[colorlinks=true, allcolors=blue]{hyperref}
 
+\usepackage{footmisc}
+
 \usepackage{tikz}
 \usetikzlibrary{shapes,arrows,positioning,fit,backgrounds}
 
@@ -25,72 +27,59 @@
 \begin{document}
 \maketitle
 
+\vspace*{-0.3cm}
 
 % Context
 Spatio-temporal databases are increasing in popularity due to increased
 production of such data by numerous IoT devices.
 As the need for such databases increases, developers try to reach for 
-open-source and familiar solutions.
+familiar  and open-source solutions.
 MobilityDB, built on top of the spatial extension PostGIS, extends PostgreSQL's 
 capabilities regarding spatio-temporal aspects.
 Previous research has shown that the MobilityDB extension can be partially used
 in conjunction with Citus, a PosgreSQL extension, which provides horizontal
 scalability options.\footnote{
-Bakli, Sakr and Zimanyi, "MobilityDB: A Mobility Database Based on PostgreSQL 
-and PostGIS," ACM Transactions on Database Systems (TODS), Volume 45, Issue 4, 
-Article No. 19, Pages 1-42, December 6, 2020
+M. Bakli, M. Sakr, and E. Zimanyi,
+"Distributed moving object data management in MobilityDB,"
+in Proc. 8th ACM SIGSPATIAL Int. Workshop on Analytics for Big Geospatial Data
+(BigSpatial '19), Chicago, IL, USA, 2019,
+pp. 1-10, doi: 10.1145/3356999.3365467.
+\label{footnote:mobilitydb}
 }
-It does it by sharding data across multiple nodes while retaining the rich
-features of PostgreSQL. While specific queries and their runtimes have been 
-evaluated\footnote{
-Bakli, Sakr, and Zimanyi, "Distributed Mobility Data Management in MobilityDB," 
-Proceedings of the 2020 21st IEEE International Conference on Mobile Data
-Management (MDM), June 2020
-},
-the vertical and horizontal scalability of the platform has not been fully
-explored and measured.
-
 % Problem Statement
-MobilityDB's distributed capabilities, enabled by integration with Citus, claim
-to enhance scalability.
-% TODO: try to shorten this section into one or two sentences
-% mention the unexplored angles
-However, the platform's ability to efficiently scale read and write operations
-under real-world workloads has not been rigorously evaluated as current research
-has primarily focused on optimizing and measuring read query performance.
-However, write throughput—critical for handling high-ingest workloads typical 
-of IoT applications—remains underexplored, especially in scenarios involving
-concurrent writes across distributed nodes.
-Questions remain about latency, throughput, and scalability in vertical and
-horizontal configurations when handling realistic spatio-temporal datasets.
+While specific queries runtimes of BerlinMOD benchmark have been 
+evaluated on 4 and 28 node clusters\footref{footnote:mobilitydb},
+horizontal and vertical scalability of the platform has not yet been fully
+explored, especially write performance.
+BerlinMOD queries are not designated for distributed MOD and different set of
+queries is required to further assess its performance.
+Moreover, testing with a wider range of cluster sizes is necessary to 
+establish the scalability pattern.
 
 % Solution Approach
 In this thesis we aim to benchmark the vertical and horizontal scalability
-regarding both read and write operations with generated spatio-temporal data to
-measure metrics like request latency and write throughput.
-% TODO: shorten by merging it with the next sections that also mention it
-We plan to deploy MobilityDB on single-node and multi-node setups.
-Additionally, we will analyze how query options affect impact on the performance
-in different configurations.
-Afterwards, we want to compare scalability trade-offs between vertical and
-horizontal approaches.
-
+using generated spatio-temporal data to measure metrics like request 
+latency, query runtime, and read/write throughput under different data sizes.
 % Aspired Implementation
 Benchmarking data will be generated using a custom data generation tool
 specifically developed for this study.
-The tool will simulate the movement and locations of birds, chosen due to their
+The tool will simulate the movement of birds, chosen due to their
 seasonal migration patterns, localized movements within standard habitats,
-varying flight heights and times.
+varying flight heights and times. The testing setup can be seen on figure
+\ref{fig:test_setup}.
 %
 We will compare the performance of MobilityDB combined with Citus on different
 hardware configurations using Google Compute Engine service on Google Cloud
 Platform.
-We will evaluate several scenarios, including vertically scaling a single node
-and scaling out by distributing MobilityDB across several instances.
+Additionally, we will evaluate several scenarios, including vertically scaling 
+a single node and scaling out by distributing MobilityDB across several 
+Afterwards, we want to compare scalability trade-offs between those two
+approaches.
 
 \begin{figure}[ht]
     \centering
     \begin{tikzpicture}[
+	font=\small,
         node distance=0.5cm,
         box/.style={
             rectangle,
@@ -118,7 +107,7 @@ and scaling out by distributing MobilityDB across several instances.
             rectangle,
             draw,
             dashed,
-            inner sep=0.5cm
+            inner sep=0.2cm
         },
         arrow/.style={
             ->,
@@ -132,14 +121,14 @@ and scaling out by distributing MobilityDB across several instances.
     \draw[arrow] (datagen) -- (db_client);
     % Coordinator node
     \node[coordinator, right=5cm of db_client] (cn) {
-         \textbf{Coordinator}\\PostgreSQL + MobilityDB + Citus};
+         \textbf{Coordinator}\\PostgreSQL \\+ MobilityDB \\+ Citus};
     % Worker nodes
     \node[worker, below=of cn] (w2) {
-	    \textbf{Worker 2}\\PostgreSQL + MobilityDB + Citus};
+	    \textbf{Worker 2}\\PostgreSQL \\+ MobilityDB \\+ Citus};
     \node[worker, left=of w2] (w1) {
-	    \textbf{Worker 1}\\PostgreSQL + MobilityDB + Citus};
+	    \textbf{Worker 1}\\PostgreSQL \\+ MobilityDB \\+ Citus};
     \node[worker, right=of w2] (w3) {
-	    \textbf{Worker N}\\PostgreSQL + MobilityDB + Citus};
+	    \textbf{Worker N}\\PostgreSQL \\+ MobilityDB \\+ Citus};
     % Connections to workers
     \draw[arrow] (cn) -- (w1);
     \draw[arrow] (cn) -- (w2);
@@ -158,22 +147,16 @@ and scaling out by distributing MobilityDB across several instances.
     \end{pgfonlayer}
     \end{tikzpicture}
     \caption{
-	Benchmarking client will use generated bird movement data and execute
+	Benchmarking client will write generated bird movement data and execute
 	the workload against System Under Test (MobilityDB cluster).
-	The cluster consists of a coordinator and multiple worker, each running
+	The cluster consists of a coordinator and multiple workers, each running
 	PostgreSQL with MobilityDB and Citus extensions. 
     }
-    \label{fig:image}
+    \label{fig:test_setup}
 \end{figure}
 
 % Analysis/ Evaluation
 % TODO:
-% - Make it shorter
-% - Shrink the diagram
-For evaluation of our results, we will employ multiple statistical and
-visualization approaches to ensure comprehensive analysis of the system's
-performance characteristics. 
-%
 Query latencies and throughput measurements will be analyzed using confidence
 intervals (95\% CI) to account for performance variability in distributed
 systems. 
@@ -182,15 +165,10 @@ To visualize the distribution of latencies across different scaling
 configurations, we will utilize Empirical Cumulative Distribution Function
 (ECDF) plots, to reveal performance patterns and tail latencies.
 %
-For write throughput analysis, we will present time series plots showing
-sustained throughput over extended periods, accompanied by statistical summaries
-including median, 95th, and 99th percentiles.
-%
 In order to validate the statistical significance of performance differences
 between vertical and horizontal scaling approaches, we will conduct paired
 t-tests where appropriate.
 %
-Each benchmark configuration will be run multiple times with sufficient duration
-(minimum 30 minutes per run) to ensure statistical reliability and to capture
-any performance degradation or variance over time.
+Each benchmark configuration will be run multiple times to ensure statistical
+reliability.
 \end{document}
