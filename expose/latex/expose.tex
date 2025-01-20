@@ -27,8 +27,6 @@
 \begin{document}
 \maketitle
 
-\vspace*{-0.3cm}
-
 % Context
 Spatio-temporal databases are increasing in popularity due to increased
 production of such data by numerous IoT devices.
@@ -61,7 +59,8 @@ The tool will simulate the movement of birds, chosen due to their
 seasonal migration patterns, localized movements within standard habitats,
 varying flight heights and times. The benchmarking setup can be seen on figure
 \ref{fig:bench_setup}.
-%
+
+% Hard implementation details
 We will compare the performance of MobilityDB combined with Citus on different
 hardware configurations using Google Compute Engine service on Google Cloud
 Platform.
@@ -124,7 +123,7 @@ approaches.
 		\textbf{Worker 1}\\MobilityDB \\+ Citus};
 	\node[worker, right=of w2] (w3) {
 		\textbf{Worker N}\\MobilityDB \\+ Citus};
-	% Connections to workers
+	% Connections of coordinator to workers
 	\draw[arrow] (cn) -- (w1);
 	\draw[arrow] (cn) -- (w2);
 	\draw[arrow] (cn) -- (w3);
@@ -134,9 +133,11 @@ approaches.
 	
 	% Group boxes
 	\begin{pgfonlayer}{background}
+		% Benchmarking client
 		\node[group, fit=(db_client) (datagen)] (client) {};
 		\node[above] at (client.north) {Benchmarking Client};
 
+		% System Under test
 		\node[group, fit=(cn) (w1) (w2) (w3)] (sut) {};
 		\node[above] at (sut.north) {System Under Test (MobilityDB Cluster)};
 	\end{pgfonlayer}
@@ -151,19 +152,15 @@ approaches.
 \end{figure}
 
 % Analysis/ Evaluation
-% TODO:
 We will measure query latencies and throughput using confidence
 intervals (95\% CI) to account for performance variability in distributed
 systems. 
-%
 To visualize the distribution of latencies across different scaling
 configurations, we will utilize Empirical Cumulative Distribution Function
 (ECDF) plots, to reveal performance patterns and tail latencies.
-%
 In order to validate the statistical significance of performance differences
 between vertical and horizontal scaling approaches, we will conduct paired
 t-tests where appropriate.
-%
-We are going to run each benchmark configuration multiple times to ensure statistical
-reliability.
+We are going to run each benchmark configuration multiple times to ensure 
+statistical reliability.
 \end{document}
