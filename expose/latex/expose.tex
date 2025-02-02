@@ -19,7 +19,7 @@
 
 \title{
 	Evaluating the Vertical and Horizontal Read and Write Scalability of 
-	MobilityDB
+	MobilityDB and CrateDB
 	\\[1ex] \large Bachelor's Thesis Exposé}
 \author{Eryk Karol Kściuczyk}
 \date{} % This removes the date
@@ -37,16 +37,21 @@ capabilities regarding spatio-temporal aspects.
 Previous research has shown that the MobilityDB extension can be partially used
 in conjunction with Citus, a PostgreSQL extension, which provides horizontal
 scalability options.
+CrateDB, on the other hand, is a distributed SQL database that is designed for
+scalability and high performance, making it a potential candidate for comparison.
 
 % Problem Statement
 While specific queries runtimes of BerlinMOD benchmark have been 
 evaluated on 4 and 28 node clusters,
 horizontal and vertical scalability of the platform has not yet been fully
-explored, especially write performance.
+explored, especially ingestion performance.
 BerlinMOD queries are not designated for distributed MOD and different set of
 queries is required to further assess its performance.
 Moreover, benchmarking with a wider range of cluster sizes is necessary to 
 establish the scalability pattern.
+Additionally, a comparison between MobilityDB+Citus and CrateDB in terms of
+horizontal scalability has not been conducted, which could provide valuable
+insights into their respective strengths and weaknesses.
 
 % Solution Approach
 In this thesis we aim to benchmark the vertical and horizontal scalability
@@ -61,11 +66,11 @@ varying flight heights and times. The benchmarking setup can be seen on figure
 \ref{fig:bench_setup}.
 
 % Hard implementation details
-We will compare the performance of MobilityDB combined with Citus on different
+We will compare the performance of MobilityDB combined with Citus and CrateDB on different
 hardware configurations using Google Compute Engine service on Google Cloud
 Platform.
 Additionally, we will evaluate several scenarios, including vertically scaling 
-a single node and scaling out by distributing MobilityDB across several
+a single node and scaling out by distributing both solutions across several
 instances. 
 Afterwards, we will compare scalability trade-offs between those two
 approaches.
