@@ -34,19 +34,19 @@ As the need for such databases increases, developers try to reach for
 familiar and open-source solutions.
 MobilityDB, built on top of the spatial extension PostGIS, extends PostgreSQL's 
 capabilities regarding spatio-temporal aspects.
-Previous research has shown that the MobilityDB extension can be partially used
-in conjunction with Citus, a PostgreSQL extension, which provides horizontal
-scalability options.
-CrateDB, on the other hand, is a distributed SQL database that is designed for
-scalability and high performance, making it a potential candidate for comparison.
+Previous research has shown that MobilityDB can also scale horizontally using
+another extension, Citus.
+As a comparison, CrateDB is a natively distributable SQL database designed for
+scalability and high performance.
 
 % Problem Statement
-While specific queries runtimes of BerlinMOD benchmark have been 
-evaluated on 4 and 28 node clusters,
-horizontal and vertical scalability of the platform has not yet been fully
-explored, especially ingestion performance.
-BerlinMOD queries are not designated for distributed MOD and different set of
-queries is required to further assess its performance.
+While the runtimes of specific queries of BerlinMOD benchmark have been 
+evaluated on 4 and 28 node clusters of MobilityDB,
+its horizontal and vertical scalability still remains underexplored.
+Previous research mostly focuses on designing queries for single node systems,
+and often does not compare systems between one another. 
+Another option, CrateDB, also has not been fully evaluated for its usability 
+in spatiotemporal use cases.
 Moreover, benchmarking with a wider range of cluster sizes is necessary to 
 establish the scalability pattern.
 Additionally, a comparison between MobilityDB+Citus and CrateDB in terms of
@@ -54,26 +54,20 @@ horizontal scalability has not been conducted, which could provide valuable
 insights into their respective strengths and weaknesses.
 
 % Solution Approach
-In this thesis we aim to benchmark the vertical and horizontal scalability
-using generated spatio-temporal data to measure metrics like request 
-latency, query runtime, and read/write throughput under different data sizes.
-% Aspired Implementation
-We will generate data for the benchmark using a custom data generation tool
-specifically developed for this study.
-The tool will simulate the movement of e-scooters, chosen due to their
-rising popularity, movements within urban areas, different 
-varying speeds and use times. The benchmarking setup for MobilityDB can be seen 
-on figure \ref{fig:bench_setup}.
+In this thesis we implement a spatiotemporal benchmark that evaluates the
+scalability of relational databases both horizontally and vertically.
+We build a data generation and benchmarking tool to stress the respective 
+systems (MobilityDB and CrateDB). The benchmark setup can be seen on figure 
+\ref{fig:bench_setup}.
 
 % Hard implementation details
-We will compare the performance of MobilityDB combined with Citus and CrateDB on different
-hardware configurations using Google Compute Engine service on Google Cloud
-Platform.
+We will compare the performance of the distributed MobilityDB and 
+CrateDB on different hardware configurations using Google Cloud Platform.
 Additionally, we will evaluate several scenarios, including vertically scaling 
 a single node and scaling out by distributing both solutions across several
 instances. 
-Afterwards, we will compare scalability trade-offs between those two
-approaches.
+We use our benchmark results to evaluate the systems for their scalability
+and also compare their performance against each other.
 
 \begin{figure}[ht]
 	\centering
@@ -120,21 +114,21 @@ approaches.
 	\draw[arrow] (datagen) -- (db_client);
 	% Coordinator node
 	\node[coordinator, right=5cm of db_client] (cn) {
-		 \textbf{Coordinator}\\MobilityDB \\+ Citus};
+		 \textbf{Master Node}};
 	% Worker nodes
 	\node[worker, below=of cn] (w2) {
-		\textbf{Worker 2}\\MobilityDB \\+ Citus};
+		\textbf{Worker Node \\ 2}};
 	\node[worker, left=of w2] (w1) {
-		\textbf{Worker 1}\\MobilityDB \\+ Citus};
+		\textbf{Worker Node \\ 1}};
 	\node[worker, right=of w2] (w3) {
-		\textbf{Worker N}\\MobilityDB \\+ Citus};
+		\textbf{Worker Node \\ N}};
 	% Connections of coordinator to workers
 	\draw[arrow] (cn) -- (w1);
 	\draw[arrow] (cn) -- (w2);
 	\draw[arrow] (cn) -- (w3);
 	% Client to SUT connections
-	\draw[arrow] (db_client) to[bend left=8] node[above] {Queries/Writes} (cn);
-	\draw[arrow] (cn) to[bend left=8] node[below] {Results} (db_client);
+	\draw[arrow] (db_client) to[bend left=13] node[above] {Queries/Writes} (cn);
+	\draw[arrow] (cn) to[bend left=5] node[below] {Results} (db_client);
 	
 	% Group boxes
 	\begin{pgfonlayer}{background}
@@ -144,28 +138,21 @@ approaches.
 
 		% System Under test
 		\node[group, fit=(cn) (w1) (w2) (w3)] (sut) {};
-		\node[above] at (sut.north) {System Under Test (MobilityDB Cluster)};
+		\node[above] at (sut.north) {System Under Test};
 	\end{pgfonlayer}
 	\end{tikzpicture}
 	\caption{
- 	Benchmarking client will write generated e-scooter movement data and execute
-	the workload against System Under Test (MobilityDB cluster).
-	The cluster consists of a coordinator and multiple workers, each running
-	PostgreSQL with MobilityDB and Citus extensions. 
+ 	Benchmarking client will write generated spatiotemporal data and execute
+	the workload against System Under Test (MobilityDB/CrateDB cluster).
+	The cluster consists of a single master node and multiple worker nodes
 	}
 	\label{fig:bench_setup}
 \end{figure}
 
 % Analysis/ Evaluation
-We will measure query latencies and throughput using confidence
-intervals (95\% CI) to account for performance variability in distributed
-systems. 
-To visualize the distribution of latencies across different scaling
-configurations, we will utilize Empirical Cumulative Distribution Function
-(ECDF) plots, to reveal performance patterns and tail latencies.
-In order to validate the statistical significance of performance differences
-between vertical and horizontal scaling approaches, we will conduct paired
-t-tests where appropriate.
-We are going to run each benchmark configuration multiple times to ensure 
-statistical reliability.
+We measure metrics such as query latency and write throughput using confidence
+intervals, while also visualizing the distribution using Empirical Cumulative
+Distribution Function (ECDF) plots, to reveal performance patterns and tail 
+latencies.
+We repeat each experiment multiple times to ensure the validity of our results.
 \end{document}
