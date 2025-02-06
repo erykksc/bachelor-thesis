@@ -60,10 +60,10 @@ latency, query runtime, and read/write throughput under different data sizes.
 % Aspired Implementation
 We will generate data for the benchmark using a custom data generation tool
 specifically developed for this study.
-The tool will simulate the movement of birds, chosen due to their
-seasonal migration patterns, localized movements within standard habitats,
-varying flight heights and times. The benchmarking setup can be seen on figure
-\ref{fig:bench_setup}.
+The tool will simulate the movement of e-scooters, chosen due to their
+rising popularity, movements within urban areas, different 
+varying speeds and use times. The benchmarking setup for MobilityDB can be seen 
+on figure \ref{fig:bench_setup}.
 
 % Hard implementation details
 We will compare the performance of MobilityDB combined with Citus and CrateDB on different
@@ -148,7 +148,7 @@ approaches.
 	\end{pgfonlayer}
 	\end{tikzpicture}
 	\caption{
-	Benchmarking client will write generated bird movement data and execute
+ 	Benchmarking client will write generated e-scooter movement data and execute
 	the workload against System Under Test (MobilityDB cluster).
 	The cluster consists of a coordinator and multiple workers, each running
 	PostgreSQL with MobilityDB and Citus extensions. 
