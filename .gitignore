@@ -1,5 +1,8 @@
 *.DS_Store
 
+# Neovim files
+*.swp
+
 # Expose
 expose/submissions/
 expose/src/expose.pdf
