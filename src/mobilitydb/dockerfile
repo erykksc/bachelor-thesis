@@ -1,57 +1,29 @@
-FROM debian:bookworm-slim
+FROM postgres:17.5-bookworm
 
-# Set environment variables
-ENV PGDATA=/var/lib/postgresql/data \
-    DBNAME=postgres
-
-# Install basic packages
-RUN apt-get update && \
+# Install required PostgreSQL extensions
+RUN set -eux; \
+    apt-get update; \
     apt-get install -y --no-install-recommends \
         curl \
         ca-certificates \
-        gosu \
         locales \
         tzdata && \
-    rm -r /var/lib/apt/lists/*
-
-# Install citus and mobilitydb
-RUN apt-get update && \
     curl https://install.citusdata.com/community/deb.sh | bash && \
     apt-get install -y --no-install-recommends \
-        postgresql-client-17 \
         postgresql-17-postgis-3 \
-        postgresql-17-citus-13.0  \
-        postgresql-17-mobilitydb && \ 
+        postgresql-17-citus-13.0 \
+        postgresql-17-mobilitydb; \
     rm -rf /var/lib/apt/lists/*
 
-# Create a system user for PostgreSQL (no shell, no home)
-RUN adduser --system --no-create-home --disabled-login postgres && \
-    mkdir -p "$PGDATA" && \
-    chown -R postgres:postgres "$PGDATA"
+# Create directory for runtime init scripts
+COPY init-db.d/ /docker-entrypoint-initdb.d/
 
-# Initialize the database as the postgres user
-RUN gosu postgres /usr/lib/postgresql/17/bin/initdb -D "$PGDATA" && \
-    gosu postgres /usr/lib/postgresql/17/bin/pg_ctl \
-        -D "$PGDATA" \
-        -o "-c shared_preload_libraries=citus" \
-        -o "-c listen_addresses='localhost'" \
-        -w start && \
-    gosu postgres psql -d "$DBNAME" -c "CREATE EXTENSION IF NOT EXISTS citus;" && \
-    gosu postgres psql -d "$DBNAME" -c "CREATE EXTENSION IF NOT EXISTS postgis;" && \
-    gosu postgres psql -d "$DBNAME" -c "CREATE EXTENSION IF NOT EXISTS mobilitydb;" && \
-    gosu postgres /usr/lib/postgresql/17/bin/pg_ctl -D "$PGDATA" -m fast -w stop
+# Healthcheck to verify PostgreSQL is up and responding
+HEALTHCHECK --interval=10s --timeout=5s --start-period=10s --retries=3 \
+  CMD pg_isready -U postgres -d postgres || exit 1
 
-# Expose default PostgreSQL port
+# Expose the default PostgreSQL port
 EXPOSE 5432
 
-# Set volume for persistent data
-VOLUME ["/var/lib/postgresql/data"]
-
-# Entrypoint using gosu to drop root privileges
-ENTRYPOINT ["gosu", "postgres"]
-
-HEALTHCHECK --interval=10s --timeout=5s --start-period=10s --retries=5 \
-    CMD bash -c 'pg_isready -U postgres -d "$DBNAME" || exit 1'
-
 # Start PostgreSQL in foreground, logging to stdout
-CMD ["/usr/lib/postgresql/17/bin/postgres", "-D", "/var/lib/postgresql/data", "-c", "shared_preload_libraries=citus"]
+CMD ["postgres","-c", "shared_preload_libraries=citus"]

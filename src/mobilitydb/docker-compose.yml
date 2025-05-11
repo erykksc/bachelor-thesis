@@ -1,31 +1,42 @@
+x-mobilitydb-base: &mobilitydb-base
+  build:
+    context: .
+    dockerfile: dockerfile
+  image: my-mobilitydb-citus-image:latest
+
 services:
   coordinator:
-    container_name: "${COMPOSE_PROJECT_NAME:-citus}_master"
+    <<: *mobilitydb-base
+    container_name: coordinator
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_PASSWORD=password
+      - WORKER_NODES=worker1:5432,worker2:5432
+        # volumes:
+        #   - ./start-coordinator.sh:/docker-entrypoint-init.d/start-coordinator.sh
+        # command: ["bash", "/docker-entrypoint-init.d/start-coordinator.sh"]
+    depends_on:
+      - worker1
+      - worker2
+    networks:
+      - citus
 
-    image: "citusdata/citus:13.0.3"
-    ports: ["${COORDINATOR_EXTERNAL_PORT:-5432}:5432"]
-    labels: ["com.citusdata.role=Master"]
-    environment: &AUTH
-      POSTGRES_USER: "${POSTGRES_USER:-postgres}"
-      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
-      PGUSER: "${POSTGRES_USER:-postgres}"
-      PGPASSWORD: "${POSTGRES_PASSWORD}"
-      POSTGRES_HOST_AUTH_METHOD: "${POSTGRES_HOST_AUTH_METHOD:-trust}"
-  worker:
-    image: "citusdata/citus:13.0.3"
-    labels: ["com.citusdata.role=Worker"]
-    depends_on: [manager]
-    environment: *AUTH
-    command: "/wait-for-manager.sh"
-    volumes:
-      - healthcheck-volume:/healthcheck
-  manager:
-    container_name: "${COMPOSE_PROJECT_NAME:-citus}_manager"
-    image: "citusdata/membership-manager:0.3.0"
-    volumes:
-      - "${DOCKER_SOCK:-/var/run/docker.sock}:/var/run/docker.sock"
-      - healthcheck-volume:/healthcheck
-    depends_on: [master]
-    environment: *AUTH
-volumes:
-  healthcheck-volume:
+  worker1:
+    <<: *mobilitydb-base
+    container_name: worker1
+    environment:
+      - POSTGRES_PASSWORD=password
+    networks:
+      - citus
+
+  worker2:
+    <<: *mobilitydb-base
+    container_name: worker2
+    environment:
+      - POSTGRES_PASSWORD=password
+    networks:
+      - citus
+
+networks:
+  citus:
