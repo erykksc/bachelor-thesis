@@ -2,7 +2,7 @@ expose.pdf: expose.tex
 	latexmk -auxdir=aux -pdf expose.tex
 
 clean:
-	latexmk -c
+	latexmk -C
 	rm -f ./expose.pdf
 	rm -rf ./aux
 
