@@ -1,0 +1,10 @@
+\section{Conclusion}
+\label{cha:conclusion}
+Serverless is a very promising paradigm for the edge as resources can be allocated in time slices (functions) instead of long-running containers or virtual machines.
+As edge nodes, however, are often resource constrained, a serverless edge platform needs to be rather lightweight which is not the case in current (cloud-focused) open-source FaaS systems.
+
+To address this gap, we have presented \textit{tinyFaaS}, a lightweight, single-node FaaS platform for edge environments.
+Using CoAP as application protocol and intelligent sharing of function containers, \textit{tinyFaaS} is able to achieve the desired properties.
+For our evaluation, we implemented a proof-of-concept prototype and ran a number of experiments in which we compared the performance of our prototype to Lean OpenWhisk (the only edge-focused open-source FaaS platform that we are aware of) and Kubeless (the most resource efficient open-source FaaS platform~\cite{Palade2019-mo}).
+While our experiments show that a native implementation can still be 40\% faster than our \textit{tinyFaaS} prototype, we also show that \textit{tinyFaaS} is 20 to 100 times faster than Lean OpenWhisk and 10 times faster than Kubeless.
+Our experiments also show that \textit{tinyFaaS} scales just as well as a native deployment and significantly better than both Lean OpenWhisk and Kubeless.

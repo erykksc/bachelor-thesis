@@ -1,0 +1,122 @@
+% This thesis template is based on the personal template of Felix Moebius. Thanks, Felix!
+% It has been extended and modified by Tobias Pfandzelter at the Scalable Software Systems group of TU Berlin.
+% It is licensed under the terms of the MIT license, meaning you are free to use it however you see fit but we accept no liability.
+% Good luck writing your thesis!
+
+\documentclass[a4paper, 11pt]{article}
+
+\usepackage[utf8x]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{fix-cm}
+
+\usepackage[a4paper, margin=3cm]{geometry}
+\usepackage[titletoc, title]{appendix}
+
+\usepackage{color}
+\usepackage{booktabs}
+\usepackage[all]{nowidow}
+\usepackage[dvipsnames]{xcolor}
+\usepackage[hidelinks]{hyperref}
+\usepackage{acronym}
+\usepackage{graphicx}
+\usepackage{url}
+\usepackage{titlesec}
+\usepackage{csquotes}
+
+\usepackage{transparent}
+\usepackage{eso-pic}
+\usepackage[section]{placeins}
+\usepackage{setspace}
+\usepackage{parskip}
+\usepackage{subcaption}
+
+\renewcommand\thefigure{%
+\thesection.\arabic{figure}}
+\renewcommand\thesubfigure{%
+\thesection.\arabic{figure}.\arabic{subfigure}}
+\renewcommand\thetable{%
+\thesection.\arabic{table}}
+
+\usepackage[main=english, ngerman]{babel}
+
+% we use the cleveref package to refer to figures, sections, etc.
+% instead of "Figure~\ref{fig:example}", write only "\cref{fig:example}" and the word "Figure" (or table, etc) will be inserted normally
+\usepackage[noabbrev,capitalise]{cleveref}
+
+\usepackage[
+    maxbibnames=99,
+    style=alphabetic,
+    url=false,
+    backend=bibtex8,
+    sortcites=true,
+]{biblatex}
+\addbibresource{refs.bib}
+\DeclareFieldFormat[online]{urldate}{Last accessed: #1}
+\DeclareFieldFormat{eprint}{arXiv: \href{https://arxiv.org/abs/#1}{#1}}
+\DeclareFieldFormat[report]{title}{``#1''}
+
+
+\newcommand{\projectTitle}{Benchmarking the Scalability Behaviour of MobilityDB and CrateDB}
+\newcommand{\thesisType}{Bachelor's Thesis}
+\newcommand{\authors}{Eryk Karol Kściuczyk}
+\newcommand{\matrikel}{468796}
+\newcommand{\authorEmail}{\href{mailto:e.ksciuczyk@campus.tu-berlin.de}{e.ksciuczyk@campus.tu-berlin.de}}
+\newcommand{\examinera}{Prof.~Dr.-Ing.~David Bermbach}
+\newcommand{\examinerb}{Prof.~Unknown}
+% \newcommand{\examinerb}{Prof.~Dr.~habil.~Odej Kao}
+\newcommand{\supervisor}{Tim Rese}
+
+\newcommand{\projectYear}{2025}
+\newcommand{\facultyName}{Fakultät Elektrotechnik und Informatik}
+\newcommand{\departmentName}{Fachgebiet Scalable Software Systems}
+
+\begin{document}
+\input{front.tex}
+
+\newpage
+
+\section*{Abstract}
+
+FaaS is a cutting-edge new service model that has developed with the current advancement of cloud computing.
+It allows software developers to deploy their applications quickly and with needed flexibility and scalability, while keeping infrastructure maintenance requirements very low.
+These benefits are very desirable in edge computing, where ever-changing technologies and requirements need to be implemented rapidly and the fluctuation and heterogeneity of service consumers is a considerable factor.
+However, edge nodes can often provide only a fraction of the performance of cloud computing infrastructure, which makes running traditional FaaS platforms infeasible.
+In this thesis, we present a new approach to FaaS that is designed from the ground up with edge computing and IoT requirements in mind.
+To keep it as lightweight as possible, we use CoAP for communication and Docker to allow for isolation between tenants while re-using containers to achieve the best performance.
+We also present a proof-of-concept implementation of our design, which we have benchmarked using a custom benchmarking tool, and we compare our results with benchmarks of Lean OpenWhisk, another FaaS platform for the edge.
+We find that our platform can outperform Lean OpenWhisk in terms of latency and throughput in all tests but that Lean OpenWhisk has higher success rates for a low number of simultaneous clients.
+
+% GERMAN
+\clearpage
+\begin{otherlanguage}
+    {ngerman}
+    \section*{Kurzfassung}
+    FaaS ist ein innovatives neues Servicemodell, das sich mit dem aktuellen Vormarsch des Cloud Computing entwickelt hat.
+    Softwareentwicklende können ihre Anwendungen schneller und mit der erforderlichen Flexibilität und Skalierbarkeit bereitstellen und gleichzeitig den Wartungsaufwand für die Infrastruktur sehr gering halten.
+    Diese Vorteile sind im Edge-Computing sehr wünschenswert, da sich ständig ändernde Technologien und Anforderungen schnell umgesetzt werden müssen und die Fluktuation und Heterogenität der Service-Consumer ein wichtiger Faktor ist.
+    Edge-Nodes können jedoch häufig nur einen Bruchteil der Leistung von Cloud-Computing-Infrastruktur bereitstellen, was die Ausführung herkömmlicher FaaS-Plattformen unmöglich macht.
+    In dieser Arbeit stellen wir einen neuen Ansatz für FaaS eine Platform vor, die von Grund auf unter Berücksichtigung von Edge-Computing- und IoT-Anforderungen entwickelt wurde.
+    Um den Overhead so gering wie möglich zu halten, nutzen wir CoAP als Messaging-Protokoll und Docker, um Applikationen voneinander zu isolieren, während Container wiederverwendet werden, um die bestmögliche Leistung zu erzielen.
+    Wir präsentieren auch eine Proof-of-Concept-Implementierung unseres Designs, die wir mit einem eigenen Benchmarking-Tool getestet haben, und vergleichen unsere Ergebnisse mit Benchmarks von Lean OpenWhisk, einer weiteren FaaS-Plattform für die Edge.
+    Wir stellen fest, dass unsere Plattform Lean OpenWhisk in Bezug auf Latenz und Durchsatz in allen Tests übertreffen kann, Lean OpenWhisk jedoch höhere Erfolgsraten bei einer geringen Anzahl gleichzeitiger Clients aufweist.
+\end{otherlanguage}
+
+\clearpage
+
+\tableofcontents
+
+\include{chapters/01_introduction.tex}
+\clearpage
+\include{chapters/02_background.tex}
+\clearpage
+\include{chapters/03_systemdesign.tex}
+\clearpage
+\include{chapters/04_evaluation.tex}
+\clearpage
+\include{chapters/05_relatedwork.tex}
+\clearpage
+\include{chapters/06_conclusion.tex}
+
+\newpage
+\printbibliography
+\end{document}
