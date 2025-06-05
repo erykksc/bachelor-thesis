@@ -47,7 +47,7 @@
     maxbibnames=99,
     style=alphabetic,
     url=false,
-    backend=bibtex8,
+    backend=biber,
     sortcites=true,
 ]{biblatex}
 \addbibresource{refs.bib}
@@ -62,13 +62,14 @@
 \newcommand{\matrikel}{468796}
 \newcommand{\authorEmail}{\href{mailto:e.ksciuczyk@campus.tu-berlin.de}{e.ksciuczyk@campus.tu-berlin.de}}
 \newcommand{\examinera}{Prof.~Dr.-Ing.~David Bermbach}
-\newcommand{\examinerb}{Prof.~Unknown}
-% \newcommand{\examinerb}{Prof.~Dr.~habil.~Odej Kao}
+\newcommand{\examinerb}{Prof.~Dr. Marc Toussaint}
 \newcommand{\supervisor}{Tim Rese}
 
 \newcommand{\projectYear}{2025}
 \newcommand{\facultyName}{Fakultät Elektrotechnik und Informatik}
 \newcommand{\departmentName}{Fachgebiet Scalable Software Systems}
+
+\newcommand{\mobilitydbc}{MDBC} % Other option is MobilityDB-C
 
 \begin{document}
 \input{front.tex}
@@ -109,7 +110,7 @@ We find that our platform can outperform Lean OpenWhisk in terms of latency and 
 \clearpage
 \include{chapters/02_background.tex}
 \clearpage
-\include{chapters/03_systemdesign.tex}
+\include{chapters/03_benchmarkdesign.tex}
 \clearpage
 \include{chapters/04_evaluation.tex}
 \clearpage

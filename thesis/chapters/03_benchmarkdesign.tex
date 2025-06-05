@@ -1,0 +1,64 @@
+\section{Benchmark Design}
+\label{cha:benchmarkdesign}
+
+% TODO: Go over all benchmark design aspects and explain the trade offs taken and why
+Based on the book "Cloud Service Benchmarking" by David Bermbach we have identified the 
+
+\subsection{Reproducibility}
+In order to minimize factors such as network latency and other unknowns I want to put the testing client/load generator as close to the SUT as possible to minimize unknown variables, such as network latency, reliability and interference of other devices.
+
+\subsection{Repeatability}
+3 Options
+* Docker images that could be run on multiple hosts, with a script that would configure the nodes
+Kubernetes
+Swarm
+
+I'll probably use nix and docker for the load generator to allow recreation of the exact same runtime with the same package versions.
+
+\subsection{Fairness}
+I don't want to focus on specific features where one database system shines (MobilityDB complex queries functionality).
+
+Here I still need to compare both of the systems to select which features are available on both.
+
+\subsection{Portability}
+I don't want to test complex query functionality as it is 
+I'm thinking of focusing primarily on write throughput, and read performance, latency.
+
+Should I trade of portability, in sense that this benchmark should exactly match the matching feature set of mobilityDB and CrateDB, or should I already look into other solutions and have greater portability, so that other systems may also be tested?
+
+\subsection{Understandability}
+I don't know what to do with the setup, as running the clusters on swarm or Kubernetes would significantly increase the barrier of entry both for me and the readers.
+
+\subsection{Relevance}
+Write throughput is important for IOT devices, and read latency is important for the users.
+
+I need to balance it out with portability and I'm gonna sacrifice it in favor of portability.
+I have to do it because MobilityDB supports more complex queries than crateDB.
+
+% TODO: Identify quality metrics to be used
+
+% TODO: Identify what to measure, which functionality both databases provide
+
+% TODO: Define measurement methods
+
+% TODO: Define the workload to be used
+% I think I will go with a synthetic workload combined with a micro benchmark strategy in order to test one quality at the time, like write throughput.
+% It is a perfect fit for my solution as it is easy to scale on distributed systems.
+% I'm gonna do an closed workload generation on fixed amount of client nodes,  in order to test how many clients the db can handle.
+
+
+% TODO: Implementation aspects
+
+
+\subsection{Kubernetes explanation}
+
+Important aspect of this benchmark was the portability as there was uncertainty where would the experiment be conducted.
+Three environments had to be taken into account.
+First, the cloud, initially it was planned to run the experiment on Google Cloud Platform but unfortunately, Google suddenly stopped providing credits for the University.
+Two, the server cluster of the University, with support for Kubernetes.
+Our machines, for testing and in case it wouldn't be possible to use different computers.
+
+Ultimately we have decided to go with Kubernetes, as it provided a way to run the database systems on all of the three environments, as well as increasing the benchmark relevance, as we assume the production systems are likely gonna be deployed in such environment.
+Additionally use of Kubernetes increased ease of use, as it is a common solution for distributed systems, along with robustness, as Kubernetes automatically revives dead nodes, allows to easily change replica count and extend the configuration for real life systems.
+
+For the data used for the benchmark we decided to use a synthetic data generator that would be run as a pod on the same Kubernetes cluster in order to minimize possible, latency and unknown variables on the network.

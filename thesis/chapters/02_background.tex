@@ -1,57 +1,46 @@
-\section{Challenges for an Edge-Based FaaS Platform}
+\section{Background}
 \label{cha:background}
 
-We have motivated the need for FaaS at the network edge, closer to service consumers such as connected sensors and actuators.
-There are some basic requirements to consider that apply to all FaaS platforms:
-At its core, a FaaS platform should be able to run custom application code in response to a network request.
-Ideally, it should also be able to respond to that request with a result from the application.
-Moreover, the platform must be able to provide an appropriate runtime environment for that application and manage request proxying, code deployment, and function management on its own.
-Furthermore, it should support multi-tenancy and multiple functions running concurrently while ensuring their isolation from each other.
-Finally, a FaaS platform needs to scale as needed, i.e., it should have the ability to process many requests in parallel~\cite{Baldini2017-zf}.
+Explain the concepts for someone who has background in cs but not in the exact field
 
-Beyond these, edge computing comes with additional challenges that an edge FaaS platform needs to handle.
-In this section, we discuss these challenges and derive requirements.
 
-\subsection{Emphasizing Resource Efficiency}
-\label{sec:efficiency}
+% TODO:distributed systems and challenges there
+Distributed systems have several challenges, such as network latency, data consistency, availability, partition tolerance (CAP theorem), and fault tolerance.
+Both databases handle this challenges differently.
+While CitusDB needs to implement its own mechanisms, MobilityDB passes those challenges to Citus extensions.
+As this thesis purpose, I want to compare system of MobilityDB + Citus against CrateDB, by all future references of MobilityDB+C I mean MobilityDB + Citus
+The MobilityDB approach allows the developers to focus on spatiotemporal aspects of the database.
+This shows by the available complex queries in the system compared to the other solution.
+CitusDB on the other hand focuses on the real-time aspect of the DB, which makes it a better solution for IoT devices and real-time analytics.
 
-In their capabilities, edge nodes can range from low-powered single-board computers to full data centers.
-Existing FaaS platforms mainly target these larger data centers or groups of servers.
-We consider instead the more common constrained edge nodes such as single-board computers or single servers.
-While they have much less computational power than a complete data center, they are far more cost-efficient in the large quantities required for edge computing and suffice for many use cases~\cite{paper_bermbach_fog_computing}.
-In such constrained environments, efficient resource allocation is a key concern:
-The platform itself should introduce as little overhead as possible and leave most resources to application code.
-And among different applications, the limited resources such as memory and CPU time need to be dynamically shared instead of statically allocated to maximize utilization.
 
-Another characteristic that distinguishes these low-power edge nodes is that they are monolithic compared to cloud applications that need to scale across several cloud machines.
-While this restricts scalability and fault-tolerance, it dramatically simplifies node management and limits the overhead of platform management.
-Some components such as a dedicated load balancer to distribute requests across several worker nodes are simply not needed.
-While certainly possible, scaling a FaaS platform across multiple edge locations is unlikely provide significant latency advantages over processing data and events in the cloud.
-This means that an edge-focused design of a FaaS platform should carefully consider which components are actually needed and which are not to minimize overheads.
+% TODO:spatiotemporal concepts and queries, explain different kinds, stationary and moving databases
+postgresql
+Maintainer: PostgreSQL Global Development Group
+License: PostgreSQL License, which is a liberal, OSI-approved open source license similar to the BSD or MIT licenses
 
-\subsection{Focus on IoT Applications}
-\label{sec:focus_on_iot}
+citus
+Maintainer: Citus Data team, which is now part of Microsoft. It is developed as an open-source extension for PostgreSQL.
+License: Follows postgresql license
 
-One of the features that makes traditional FaaS platform so easy to use are the variety of ``triggers'' that can be used to invoke functions.
-For example, AWS Lambda can execute functions in response to cloud infrastructure monitoring events, cloud storage file changes, data streams, or even incoming e-mails~\cite{Baldini2017-zf}.
-These triggers, however, all require custom protocols and components, which is not feasible in edge environments where device heterogeneity and a lack of resources can only be addressed through interoperable, standardized messaging protocols instead of exposing a multitude of trigger endpoints.
-While HTTP is a popular choice for web applications, it often introduces an additional overhead compared to alternative protocols, especially for constrained devices.
-Latency, in particular, is a critical factor in the IoT and one of the main reasons to process data at the edge rather than the cloud.
-Alternative messaging protocols such as MQTT or CoAP can help to reduce latency and tend to be far more resource efficient~\cite{Laaroussi2018-fk,Naik2017-cn}.
+mobilitydb
+Maintainer: its own open-source community, and it is also an OSGeo community project.
+License: Follows postgresql license
 
-Therefore, an edge FaaS platform should natively support such IoT messaging protocols yet can do without custom triggers that are only relevant for cloud applications.
 
-\subsection{Extensibility}
-\label{sec:extensibility}
-
-Another challenge is the heterogeneity of edge computing nodes and applications.
-This may include the underlying hardware, the network stack, or the available function runtimes.
-Platform operators who deploy the platform in their edge environments have to be able to integrate it within their existing deployments.
-This may require the platform to be modified slightly to be able run on different hardware~\cite{paper_bermbach_fog_computing}.
-
-Furthermore, the platform needs to be extensible as new IoT and cloud technologies are developed at a rapid pace.
-It should be possible to extend the platform to support new technology without being dependent on cloud service providers to make a new technology available.
-This also promotes a wider variety of available technologies that users may choose from.
-
-Therefore, a FaaS platform for the edge has to be open instead of proprietary.
-In that sense, it is not only important that source code of any implementation is free and publicly available, but also that the platform itself is designed to use interchangeable components and open protocols.
+% TODO: small comparison of Mobilitydb and CrateDB (maybe a table)
+\begin{table}[h]
+  \centering
+  \begin{tabular}{|c|c|c|}
+    \hline
+    Category & MobilityDB & CrateDB \\
+    \hline
+    Open source & Yes & Yes \\
+    Maintained by & PostgreSQL by PostgreSQL Global Development Group, Citus by Citus Data team, which is now part of Microsoft, MobilityDB by its own open-source community, and it is also an OSGeo community project& Crate.io \\ 
+    Supports SQL Queries & Yes & Yes \\
+    Built from ground up & No (it is built on PostGIS and Citus) & Yes \\
+    License & OSI-approved open source license similar to the BSD or MIT licenses & Apache 2.0 \\
+    \hline
+  \end{tabular}
+  \caption{Sample Table}
+\end{table}

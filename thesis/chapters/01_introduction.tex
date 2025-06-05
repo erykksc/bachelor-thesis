@@ -1,29 +1,24 @@
 \section{Introduction}
 \label{cha:introduction}
 
-Function-as-a-Service (FaaS) is a cutting-edge service model that has developed with the current advancement of cloud computing.
-Cloud functions allow custom code to be executed in response to an event.
-In most cases, developers need only worry about their actual code, as event queuing, underlying infrastructure, dynamic scaling, and dispatching are all handled by the cloud provider~\cite{Baldini2017-zf,McGrath2017-or}.
+Spatio-temporal databases are increasing in popularity due to increased production of such data by smart cities, personal light electric vehicles and numerous IoT devices.
+As the need for such databases raises, developers try to reach for familiar and open-source solutions.
+MobilityDB, built on top of the spatial extension PostGIS, extends PostgreSQL's capabilities regarding spatio-temporal aspects.
+Previous research has shown that MobilityDB can also scale horizontally using another extension, Citus.
+In this thesis we will refer to distributed MobilityDB using Citus as \mobilitydbc.
+As a comparison, CrateDB is a natively distributable SQL database designed for scalability and high performance.
 
-This scalable and flexible event-based programming model is a great fit for IoT event and data processing.
-Consider as an example a connected button and lightbulb.
-When the button is pressed it sends an event to a function in the cloud which in turn sends a command to the lamp to turn on the light.
-The three components are easily connected and only the actual function code would need to be provided.
-Thanks to managed FaaS, this approach also scales from two devices to thousands of devices without any additional configuration.
-
-Current FaaS platforms do provide these benefits for the IoT, however, using them in this way is inefficient.
-Sending all events and data to the cloud for processing leads to a high load on the network and high response latency~\cite{paper_zhang_cloud_is_not_enough_GDP,paper_bermbach_fog_computing}.
-It is much more efficient to process IoT data closer to their service consumers such as our lightbulb and button, as is the idea of fog computing~\cite{Bermbach2020-sf,Pfandzelter2019-so}.
-Positioned in the same network, our button may send its event to an edge function placed, for example, on a common gateway.
-This also introduces additional transparency about data movement within the network and alleviates some security concerns about cloud computing~\cite{Bonomi2012-if,paper_bermbach_fog_computing}.
-
-Currently, however, there are no open FaaS platforms that are built specifically for IoT data processing at the edge.
-State-of-the-art platforms are instead built for powerful cloud hardware, for web-based services, or are proprietary software that is not extensible.
+While the runtimes of specific queries of BerlinMOD benchmark have been evaluated on 4 and 28 node clusters of \mobilitydbc, its horizontal and vertical scalability still remains underexplored.
+Previous research mostly focuses on designing queries for single node systems, and often does not compare systems between one another. 
+Another open source option, CrateDB, also has not been fully evaluated for its usability in spatiotemporal use cases.
+Moreover, benchmarking with a wider range of cluster sizes is necessary to establish the scalability pattern.
+Additionally, a comparison between MobilityDB+Citus and CrateDB in terms of horizontal scalability has not been conducted, which could provide valuable insights into their respective strengths and weaknesses.
 
 We therefore make the following contributions in this thesis:
 
 \begin{enumerate}
-    \item We discuss the unique challenges of IoT data processing and edge computing and derive requirements for an edge FaaS platform (\cref{cha:background})
-    \item We introduce \textit{tinyFaaS}, a novel FaaS platform architecture that addresses the requirements we have identified (\cref{cha:systemdesign})
-    \item We evaluate \textit{tinyFaaS} through a proof-of-concept prototype and a number of experiments in which we compare it to state-of-the-art FaaS platforms, namely Kubeless and Lean OpenWhisk (\cref{cha:evaluation})
+    \item We discuss the unique value propositions of both databases (\cref{cha:background})
+    \item We design and implement a benchmark of common functionality of both databases that addresses the scalability according to requirements we have identified (\cref{cha:benchmarkdesign})
+    \item We setup and run the experiment on 4 cluster sizes using our custom benchmark (\cref{cha:evaluation})
+    \item We analyze the results for scalability patterns and discuss the results of the benchmark (\cref{cha:evaluation})
 \end{enumerate}
