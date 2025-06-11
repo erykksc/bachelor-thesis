@@ -2,13 +2,14 @@
 \label{cha:introduction}
 
 Spatio-temporal databases are increasing in popularity due to increased production of such data by smart cities, personal light electric vehicles and numerous IoT devices.
-As the need for such databases raises, developers try to reach for familiar and open-source solutions.
-MobilityDB, built on top of the spatial extension PostGIS, extends PostgreSQL's capabilities regarding spatio-temporal aspects.
-Previous research has shown that MobilityDB can also scale horizontally using another extension, Citus.
+As the need for such databases raises, developers reach for ready open-source solutions.
+One of such ready solutions is MobilityDB, built on top of the spatial extension PostGIS, extends PostgreSQL's capabilities regarding spatio-temporal aspects~\cite{zimanyiMobilityDBMobilityDatabase2020}.
+Previous research has shown that MobilityDB can also scale horizontally using another extension, Citus~\cite{bakli-2020,bakli-2019,cubukcuCitusDistributedPostgreSQL2021}.
 In this thesis we will refer to distributed MobilityDB using Citus as \mobilitydbc.
 As a comparison, CrateDB is a natively distributable SQL database designed for scalability and high performance.
+Both of the solutions are open source.
 
-While the runtimes of specific queries of BerlinMOD benchmark have been evaluated on 4 and 28 node clusters of \mobilitydbc, its horizontal and vertical scalability still remains underexplored.
+While the runtimes of specific queries of BerlinMOD benchmark~\cite{duntgenBerlinMODBenchmarkMoving2009} have been evaluated on 4 and 28 node clusters of \mobilitydbc~\cite{bakli-2020}, its horizontal and vertical scalability still remains underexplored.
 Previous research mostly focuses on designing queries for single node systems, and often does not compare systems between one another. 
 Another open source option, CrateDB, also has not been fully evaluated for its usability in spatiotemporal use cases.
 Moreover, benchmarking with a wider range of cluster sizes is necessary to establish the scalability pattern.
