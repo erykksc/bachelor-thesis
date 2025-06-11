@@ -30,6 +30,8 @@
 \usepackage{parskip}
 \usepackage{subcaption}
 
+\usepackage{array}
+
 \renewcommand\thefigure{%
 \thesection.\arabic{figure}}
 \renewcommand\thesubfigure{%
@@ -69,7 +71,9 @@
 \newcommand{\facultyName}{Fakultät Elektrotechnik und Informatik}
 \newcommand{\departmentName}{Fachgebiet Scalable Software Systems}
 
+
 \newcommand{\mobilitydbc}{MDBC} % Other option is MobilityDB-C
+\newcolumntype{P}[1]{>{\centering\arraybackslash}p{#1}}
 
 \begin{document}
 \input{front.tex}

@@ -1,8 +1,6 @@
+% TODO: Explain the concepts for someone who has background in cs but not in the exact field
 \section{Background}
 \label{cha:background}
-
-Explain the concepts for someone who has background in cs but not in the exact field
-
 
 % TODO:distributed systems and challenges there
 Distributed systems have several challenges, such as network latency, data consistency, availability, partition tolerance (CAP theorem), and fault tolerance.
@@ -13,34 +11,88 @@ The MobilityDB approach allows the developers to focus on spatiotemporal aspects
 This shows by the available complex queries in the system compared to the other solution.
 CitusDB on the other hand focuses on the real-time aspect of the DB, which makes it a better solution for IoT devices and real-time analytics.
 
+Spatiotemporal data contains spatial (location-based) and temporal (time-based) aspects.
+Geographic coordinates are a common way to make data geo-referenced, and a timestamp is used as temporal tag. \cite{alamSurveySpatiotemporalData2022}
 
-% TODO:spatiotemporal concepts and queries, explain different kinds, stationary and moving databases
-postgresql
-Maintainer: PostgreSQL Global Development Group
-License: PostgreSQL License, which is a liberal, OSI-approved open source license similar to the BSD or MIT licenses
+There are many types of queries on can perform on spatiotemporal data:
+\begin{itemize}
+	\item \textbf{Spatiotemporal Range Query:} Retrieves objects or events that occurred within a specific geographic area during a defined time window.
+		e.g. Find all vehicles that were in Berlin between 7:00 and 9:00 on Friday, June 6, 2025.
 
-citus
-Maintainer: Citus Data team, which is now part of Microsoft. It is developed as an open-source extension for PostgreSQL.
-License: Follows postgresql license
+	\item \textbf{Time Slice Query:} Retrieve all objects that are in a specific spatial area at a single point in time.
+		e.g. Find all buses that were in Warsaw in Wola district center at 15:00 on Tuesday, July 23, 2025.
 
-mobilitydb
-Maintainer: its own open-source community, and it is also an OSGeo community project.
-License: Follows postgresql license
+	\item \textbf{Window Queries:} Retrieve all objects that intersect a spatial area during a given time window.
+		e.g. Find all trains that passed through Berlin Central Station between 10:00 and 12:00 on Wednesday, May 4, 2025. 
 
+	\item \textbf{Trajectory Query:} Extracts or analyzes the movement path of an object over time.
+		e.g. Show the movement path of a delivery drone as it traveled across Hamburg between 10:00 and 11:00 on Monday, June 2, 2025.
 
-% TODO: small comparison of Mobilitydb and CrateDB (maybe a table)
+	\item \textbf{Spatiotemporal Join:} Identifies pairs of objects that came into spatial proximity during overlapping time intervals.
+		e.g. Identify all pairs of taxis that came within 10 meters of each other between 16:00 and 20:00 on Friday night, June 6, 2025. 
+
+	\item \textbf{k-Nearest Neighbor:} Finds the closest objects to a given location at a specific time or within a time window.
+		e.g. List the five ambulances that were closest to the intersection of Friedrichstraße and Unter den Linden in Berlin at 14:35 on Thursday, June 5, 2025.
+\end{itemize}
+
+Furthermore, two types of spatiotemporal data can be distinguished.
+Stationary data refers to objects that do not change their position over time, such as weather stations and stationary sensors.
+Moving (dynamic) data refers to objects that change their position over time, such as vehicles, people, or animals.
+
+% Comparison of MobilityDB and CrateDB (maybe a table)
+% postgresql
+% Maintainer: PostgreSQL Global Development Group
+% License: PostgreSQL License, which is a liberal, OSI-approved open source license similar to the BSD or MIT licenses
+%
+% citus
+% Maintainer: Citus Data team, which is now part of Microsoft. It is developed as an open-source extension for PostgreSQL.
+% License: Follows postgresql license
+%
+% mobilitydb
+% Maintainer: its own open-source community, and it is also an OSGeo community project.
+% License: Follows postgresql license
+
+% TODO: Add citations/footnotes for all the features
+% https://www.perplexity.ai/search/which-of-these-queries-is-supp-n5CXpQokRBW2lIHKPA0yLg
+\mobilitydbc and CrateDB have varying support for different types of queries.
+CitusDB has a limited support for spatiotemporal queries, as it is primarily designed for real-time analytics and horizontal scalability.
+On the other hand, MobilityDB has comprehensive support for spatiotemporal queries, including complex queries such as spatiotemporal joins and k-nearest neighbor queries.
+The table \ref{tab:mobilitydb_vs_cratedb} shows the differences between \mobilitydbc and CrateDB and the queries the systems support.
 \begin{table}[h]
   \centering
-  \begin{tabular}{|c|c|c|}
+  \begin{tabular}{|c|P{6cm}|P{4cm}|}
     \hline
-    Category & MobilityDB & CrateDB \\
+    Category & \mobilitydbc & CrateDB \\
     \hline
     Open source & Yes & Yes \\
-    Maintained by & PostgreSQL by PostgreSQL Global Development Group, Citus by Citus Data team, which is now part of Microsoft, MobilityDB by its own open-source community, and it is also an OSGeo community project& Crate.io \\ 
+    \hline
+	Maintained by & 
+		PostgreSQL Global Development Group,
+		Citus Data team (now part of Microsoft),
+		MobilityDB Community, and OSGeo community
+	 & Crate.io \\
+    \hline
     Supports SQL Queries & Yes & Yes \\
-    Built from ground up & No (it is built on PostGIS and Citus) & Yes \\
+    \hline
+    Built from ground up & No, it is built on PostGIS and Citus & Yes \\
+    \hline
     License & OSI-approved open source license similar to the BSD or MIT licenses & Apache 2.0 \\
     \hline
+	% Terminology spatiotemporal data & tgeompoint / tgeogpoint (moving object data) & geo\_point / geo\_shape (geospatial data) + time series (combined modeling) \\
+	% Spatiotemporal Range Query & Yes \footcite{bakliDistributedSpatiotemporalTrajectory2020} & Partial (no native spatiotemporal types) \\
+	Time Slice Query & Yes & Yes \\
+    \hline
+	Window Queries & Yes\footfullcite{bakliDistributedSpatiotemporalTrajectory2020} & Yes \\
+    \hline
+	Trajectory Query & Yes\footcite{bakliDistributedSpatiotemporalTrajectory2020} & No \\
+    \hline
+	Spatiotemporal Join & Yes\footcitetext{bakliDistributedSpatiotemporalTrajectory2020} & Partial \\
+    \hline
+	k-Nearest Neighbor & Partial\footcite{bakliDistributedSpatiotemporalTrajectory2020} (spatial, some temporal) & Partial (spatial/vector, not spatiotemporal) \\
+    \hline
   \end{tabular}
-  \caption{Sample Table}
+  \caption{Table comparing MobilityDB and CrateDB}
+  \label{tab:mobilitydb_vs_cratedb}
 \end{table}
+
+We designed a benchmark by using features supported by both database systems.
