@@ -1,20 +1,18 @@
-% TODO: Explain the concepts for someone who has background in cs but not in the exact field
+% NOTE: Explain the concepts for someone who has background in cs but not in the exact field
 \section{Background}
 \label{cha:background}
 
-% TODO:distributed systems and challenges there
-Distributed systems have several challenges, such as network latency, data consistency, availability, partition tolerance (CAP theorem), and fault tolerance.
-Both databases handle this challenges differently.
-While CitusDB needs to implement its own mechanisms, MobilityDB passes those challenges to Citus extensions.
-As this thesis purpose, I want to compare system of MobilityDB + Citus against CrateDB, by all future references of MobilityDB+C I mean MobilityDB + Citus
-The MobilityDB approach allows the developers to focus on spatiotemporal aspects of the database.
-This shows by the available complex queries in the system compared to the other solution.
-CitusDB on the other hand focuses on the real-time aspect of the DB, which makes it a better solution for IoT devices and real-time analytics.
-
+\subsection{Spatiotemporal Data and Queries}
+% NOTE: Spatiotemporal data
 Spatiotemporal data contains spatial (location-based) and temporal (time-based) aspects.
-Geographic coordinates are a common way to make data geo-referenced, and a timestamp is used as temporal tag. \cite{alamSurveySpatiotemporalData2022}
+Geographic coordinates are a common way to make data geo-referenced, and a timestamp is often used as a temporal tag. \cite{alamSurveySpatiotemporalData2022}
 
-There are many types of queries on can perform on spatiotemporal data:
+Furthermore, two types of spatiotemporal data can be distinguished.
+Stationary data refers to objects that do not change their position over time, such as weather stations and stationary sensors.
+Moving (dynamic) data refers to objects that change their position over time, such as vehicles, people, or animals.
+
+% NOTE: Spatiotemporal queries
+There are many types of queries that can be performed on spatiotemporal data, here is the list of a common ones.
 \begin{itemize}
 	\item \textbf{Spatiotemporal Range Query:} Retrieves objects or events that occurred within a specific geographic area during a defined time window.
 		e.g. Find all vehicles that were in Berlin between 7:00 and 9:00 on Friday, June 6, 2025.
@@ -35,34 +33,66 @@ There are many types of queries on can perform on spatiotemporal data:
 		e.g. List the five ambulances that were closest to the intersection of Friedrichstraße and Unter den Linden in Berlin at 14:35 on Thursday, June 5, 2025.
 \end{itemize}
 
-Furthermore, two types of spatiotemporal data can be distinguished.
-Stationary data refers to objects that do not change their position over time, such as weather stations and stationary sensors.
-Moving (dynamic) data refers to objects that change their position over time, such as vehicles, people, or animals.
+\subsection{Distributed Database Management Systems (DDBMS)}
+% NOTE: distributed systems and challenges of them
+Distributed Database Management Systems (DDBMS) are systems in which the database is distributed across multiple physical locations, often connected via a network.
+These locations can be on different servers, in different data centers, or even across different geographic regions.
+The primary goal of a DDBMS is to manage a distributed database in such a way that it appears to the user as a single logical database, hiding the complexities of data distribution and replication.
 
-% Comparison of MobilityDB and CrateDB (maybe a table)
-% postgresql
-% Maintainer: PostgreSQL Global Development Group
-% License: PostgreSQL License, which is a liberal, OSI-approved open source license similar to the BSD or MIT licenses
-%
-% citus
-% Maintainer: Citus Data team, which is now part of Microsoft. It is developed as an open-source extension for PostgreSQL.
-% License: Follows postgresql license
-%
-% mobilitydb
-% Maintainer: its own open-source community, and it is also an OSGeo community project.
-% License: Follows postgresql license
+\subsection{Challanges in Distributed Systems}
+Distributed systems, including DDBMSs, face several inherent challenges:
+\begin{itemize}
+	\item \textbf{Network Latency:} Communication between nodes in a distributed system is significantly slower than accessing local memory or storage.
+		This delay can affect query performance and data synchronization.
 
-% TODO: Add citations/footnotes for all the features
-% https://www.perplexity.ai/search/which-of-these-queries-is-supp-n5CXpQokRBW2lIHKPA0yLg
-\mobilitydbc and CrateDB have varying support for different types of queries.
-CitusDB has a limited support for spatiotemporal queries, as it is primarily designed for real-time analytics and horizontal scalability.
-On the other hand, MobilityDB has comprehensive support for spatiotemporal queries, including complex queries such as spatiotemporal joins and k-nearest neighbor queries.
-The table \ref{tab:mobilitydb_vs_cratedb} shows the differences between \mobilitydbc and CrateDB and the queries the systems support.
+	\item \textbf{Data Consistency:} Ensuring that all nodes reflect the same data at the same time is difficult, especially in the presence of updates.
+		Different consistency models (such as eventual consistency or strong consistency) are used depending on the application requirements.
+
+	\item \textbf{Availability:} A highly available system must respond to requests even if some parts of the system are down.
+		Maintaining availability while ensuring consistency can be challenging.
+
+	\item \textbf{Partition Tolerance:} This refers to a system's ability to continue operating even when network partitions occur—i.e., when communication between some nodes fails.
+		The CAP theorem (discussed below) emphasizes the trade-offs among consistency, availability, and partition tolerance.
+
+	\item \textbf{Fault Tolerance:} Distributed systems must be resilient to hardware failures, crashes, and other unexpected issues.
+		Mechanisms such as replication and failover are often used to ensure data is not lost and services continue to function.
+\end{itemize}
+
+\subsubsection{CAP Theorem}
+A central concept in understanding distributed databases is the CAP theorem, which states that a distributed system can guarantee only two of the following three properties at the same time:
+
+\begin{itemize}
+	\item \textbf{Consistency (C):} Every read receives the most recent write or an error.
+	\item \textbf{Availability (A):} Every request receives a (non-error) response, without the guarantee that it contains the most recent write.
+	\item \textbf{Partition Tolerance (P):} The system continues to operate despite arbitrary message loss or failure of part of the system.
+\end{itemize}
+
+Due to the CAP theorem, distributed databases must make design trade-offs based on the requirements of the application they serve.
+
+\subsubsection{Handling Challenges in Different DDBMSs}
+Different distributed databases such as \mobilitydbc~and CrateDB handle these challenges in different ways.
+
+\textbf{MobilityDB} is an extension of PostgreSQL that supports spatiotemporal data types and queries, commonly used in mobility and geographic information systems (GIS).
+To achieve scalability and distribution, it can be combined with Citus, a PostgreSQL extension that enables horizontal scaling through sharding and distributed query execution.
+Since MobilityDB is built on PostgreSQL and uses Citus for distribution, it maintains strong consistency and full ACID compliance.
+This is ideal for applications where data correctness and transactional integrity are critical.
+
+\textbf{CrateDB} is a distributed SQL database designed for high ingest rates and real-time analytics over large-scale time-series and machine data.
+It is based on shared-nothing architecture using Elasticsearch and Lucene under the hood.
+CrateDB uses a distributed eventual consistency model, meaning data written to one node may take time to propagate to others.
+It relaxes ACID constraints to gain performance and scalability, making it less suitable for applications requiring strict consistency.
+
+% NOTE: Comparison of MobilityDB and CrateDB
+% Citations for the support of the queries: https://www.perplexity.ai/search/which-of-these-queries-is-supp-n5CXpQokRBW2lIHKPA0yLg
+Additionally, the differences between \mobilitydbc~and CrateDB can be seen by the available complex queries in \mobilitydbc~compared to the possibilities of CrateDB.
+\mobilitydbc~has comprehensive support for spatiotemporal queries, including complex queries such as spatiotemporal joins and k-nearest neighbor queries \cite{bakliDistributedSpatiotemporalTrajectory2020,QueryingDataMobilitydbDocs}.
+On the other hand CrateDB focuses on the real-time analytics and horizontal scalability, which makes it a better solution for IoT devices and real-time analytics \cite{CrateDBDocumentation}.
+The table \ref{tab:mobilitydb_vs_cratedb} shows the differences between \mobilitydbc~and CrateDB and the queries the systems support.
 \begin{table}[h]
   \centering
-  \begin{tabular}{|c|P{6cm}|P{4cm}|}
+  \begin{tabular}{|P{3.3cm}|P{6cm}|P{4cm}|}
     \hline
-    Category & \mobilitydbc & CrateDB \\
+    Category & \mobilitydbc~& CrateDB \\
     \hline
     Open source & Yes & Yes \\
     \hline
@@ -72,27 +102,30 @@ The table \ref{tab:mobilitydb_vs_cratedb} shows the differences between \mobilit
 		MobilityDB Community, and OSGeo community
 	 & Crate.io \\
     \hline
-    Supports SQL Queries & Yes & Yes \\
+    Consistency & Full ACID compliance & Eventual Consistancy \\
     \hline
-    Built from ground up & No, it is built on PostGIS and Citus & Yes \\
+    Supports SQL Queries & Yes & Yes \\
     \hline
     License & OSI-approved open source license similar to the BSD or MIT licenses & Apache 2.0 \\
     \hline
-	% Terminology spatiotemporal data & tgeompoint / tgeogpoint (moving object data) & geo\_point / geo\_shape (geospatial data) + time series (combined modeling) \\
-	% Spatiotemporal Range Query & Yes \footcite{bakliDistributedSpatiotemporalTrajectory2020} & Partial (no native spatiotemporal types) \\
+	% Supported spatiotemporal types & tgeompoint / tgeogpoint & geo\_point / geo\_shape (geospatial data) + time series (combined modeling) \\
+	Supports spatiotemporal datatypes & Yes, builtin datatypes & Yes, geospatial data + time series (combined modeling) \\
+	\hline
+	Spatiotemporal Range Query & Yes & Partial (no native spatiotemporal types) \\
+	\hline
 	Time Slice Query & Yes & Yes \\
     \hline
-	Window Queries & Yes\footfullcite{bakliDistributedSpatiotemporalTrajectory2020} & Yes \\
+	Window Queries & Yes & Yes \\
     \hline
-	Trajectory Query & Yes\footcite{bakliDistributedSpatiotemporalTrajectory2020} & No \\
+	Trajectory Query & Yes & No \\
     \hline
-	Spatiotemporal Join & Yes\footcitetext{bakliDistributedSpatiotemporalTrajectory2020} & Partial \\
+	Spatiotemporal Join & Yes & Partial \\
     \hline
-	k-Nearest Neighbor & Partial\footcite{bakliDistributedSpatiotemporalTrajectory2020} (spatial, some temporal) & Partial (spatial/vector, not spatiotemporal) \\
+	k-Nearest Neighbor & Partial (spatial, some temporal) & Partial (spatial/vector, not spatiotemporal) \\
     \hline
   \end{tabular}
   \caption{Table comparing MobilityDB and CrateDB}
   \label{tab:mobilitydb_vs_cratedb}
 \end{table}
 
-We designed a benchmark by using features supported by both database systems.
+We designed a benchmark by using feature set supported by both database systems.
