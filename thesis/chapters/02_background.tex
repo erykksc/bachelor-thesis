@@ -4,10 +4,16 @@
 
 \subsection{Spatiotemporal Data and Queries}
 % NOTE: Spatiotemporal data
-Spatiotemporal data contains spatial (location-based) and temporal (time-based) aspects.
+Spatiotemporal (ST) data contains spatial (location-based) and temporal (time-based) aspects.
 Geographic coordinates are a common way to make data geo-referenced, and a timestamp is often used as a temporal tag. \cite{alamSurveySpatiotemporalData2022}
 
-Furthermore, two types of spatiotemporal data can be distinguished.
+Furthermore, four types of spatiotemporal data can be distinguished.
+(i) \textbf{event data}, consisting of discrete occurrences at specific locations and times (e.g., sightings of wild animals in a national park),
+(ii) \textbf{trajectory data}, where trajectories of moving bodies are being measured (e.g., the route of a bus), 
+(iii) \textbf{point reference data}, as described by \cite{cressieStatisticsSpatioTemporalData2015}, refers to measurements taken from a continuous ST process at specific locations that move over time (e.g., tracking surface temperature using weather balloons that drift through the atmosphere), and 
+(iv) \textbf{raster data}, where collected observations of an ST field are gathered at fixed cells in an ST grid (e.g., fMRI scans of brain activity).
+\cite{atluriSpatioTemporalDataMining2018}
+
 Stationary data refers to objects that do not change their position over time, such as weather stations and stationary sensors.
 Moving (dynamic) data refers to objects that change their position over time, such as vehicles, people, or animals.
 
@@ -38,6 +44,7 @@ There are many types of queries that can be performed on spatiotemporal data, he
 Distributed Database Management Systems (DDBMS) are systems in which the database is distributed across multiple physical locations, often connected via a network.
 These locations can be on different servers, in different data centers, or even across different geographic regions.
 The primary goal of a DDBMS is to manage a distributed database in such a way that it appears to the user as a single logical database, hiding the complexities of data distribution and replication.
+\cite{ozsuDistributedParallelDatabase1996}
 
 \subsection{Challanges in Distributed Systems}
 Distributed systems, including DDBMSs, face several inherent challenges:
@@ -59,7 +66,7 @@ Distributed systems, including DDBMSs, face several inherent challenges:
 \end{itemize}
 
 \subsubsection{CAP Theorem}
-A central concept in understanding distributed databases is the CAP theorem, which states that a distributed system can guarantee only two of the following three properties at the same time:
+A central concept in understanding distributed databases is the CAP theorem, introduced by \cite{brewerRobustDistributedSystems2000} and formally proven by \cite{gilbertBrewersConjectureFeasibility2002}, which states that a distributed system can guarantee only two of the following three properties at the same time:
 
 \begin{itemize}
 	\item \textbf{Consistency (C):} Every read receives the most recent write or an error.
@@ -72,9 +79,9 @@ Due to the CAP theorem, distributed databases must make design trade-offs based 
 \subsubsection{Handling Challenges in Different DDBMSs}
 Different distributed databases such as \mobilitydbc~and CrateDB handle these challenges in different ways.
 
-\textbf{MobilityDB} is an extension of PostgreSQL that supports spatiotemporal data types and queries, commonly used in mobility and geographic information systems (GIS).
-To achieve scalability and distribution, it can be combined with Citus, a PostgreSQL extension that enables horizontal scaling through sharding and distributed query execution.
-Since MobilityDB is built on PostgreSQL and uses Citus for distribution, it maintains strong consistency and full ACID compliance.
+\textbf{\mobilitydbc}~uses MobilityDB which is an extension of PostgreSQL that supports spatiotemporal data types and queries, commonly used in mobility and geographic information systems (GIS).
+To achieve horizontal scalability, MobilityDB is combined with Citus, another PostgreSQL extension that enables horizontal scaling through sharding and distributed query execution.
+Since \mobilitydbc~is built on PostgreSQL and uses Citus for distribution, it maintains strong consistency and full ACID compliance.
 This is ideal for applications where data correctness and transactional integrity are critical.
 
 \textbf{CrateDB} is a distributed SQL database designed for high ingest rates and real-time analytics over large-scale time-series and machine data.
@@ -124,7 +131,7 @@ The table \ref{tab:mobilitydb_vs_cratedb} shows the differences between \mobilit
 	k-Nearest Neighbor & Partial (spatial, some temporal) & Partial (spatial/vector, not spatiotemporal) \\
     \hline
   \end{tabular}
-  \caption{Table comparing MobilityDB and CrateDB}
+  \caption{Table comparing \mobilitydbc~and CrateDB}
   \label{tab:mobilitydb_vs_cratedb}
 \end{table}
 
