@@ -6,4 +6,4 @@ thesis.pdf:
 clean:
 	latexmk -C
 	find chapters -name '*.aux' -delete
-	rm *.bbl
+	rm -f *.bbl
