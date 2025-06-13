@@ -5,14 +5,14 @@
 \subsection{Spatiotemporal Data and Queries}
 % NOTE: Spatiotemporal data
 Spatiotemporal (ST) data contains spatial (location-based) and temporal (time-based) aspects.
-Geographic coordinates are a common way to make data geo-referenced, and a timestamp is often used as a temporal tag. \cite{alamSurveySpatiotemporalData2022}
+Geographic coordinates are a common way to make data geo-referenced, and a timestamp is often used as a temporal tag. \parencite{alamSurveySpatiotemporalData2022}
 
 Furthermore, four types of spatiotemporal data can be distinguished.
 (i) \textbf{event data}, consisting of discrete occurrences at specific locations and times (e.g., sightings of wild animals in a national park),
 (ii) \textbf{trajectory data}, where trajectories of moving bodies are being measured (e.g., the route of a bus), 
-(iii) \textbf{point reference data}, as described by \cite{cressieStatisticsSpatioTemporalData2015}, refers to measurements taken from a continuous ST process at specific locations that move over time (e.g., tracking surface temperature using weather balloons that drift through the atmosphere), and 
+(iii) \textbf{point reference data}, as described by \parencite{cressieStatisticsSpatioTemporalData2015}, refers to measurements taken from a continuous ST process at specific locations that move over time (e.g., tracking surface temperature using weather balloons that drift through the atmosphere), and 
 (iv) \textbf{raster data}, where collected observations of an ST field are gathered at fixed cells in an ST grid (e.g., fMRI scans of brain activity).
-\cite{atluriSpatioTemporalDataMining2018}
+\parencite{atluriSpatioTemporalDataMining2018}
 
 Stationary data refers to objects that do not change their position over time, such as weather stations and stationary sensors.
 Moving (dynamic) data refers to objects that change their position over time, such as vehicles, people, or animals.
@@ -66,7 +66,7 @@ Distributed systems, including DDBMSs, face several inherent challenges:
 \end{itemize}
 
 \subsubsection{CAP Theorem}
-A central concept in understanding distributed databases is the CAP theorem, introduced by \cite{brewerRobustDistributedSystems2000} and formally proven by \cite{gilbertBrewersConjectureFeasibility2002}, which states that a distributed system can guarantee only two of the following three properties at the same time:
+A central concept in understanding distributed databases is the CAP theorem, introduced by \parencite{brewerRobustDistributedSystems2000} and formally proven by \parencite{gilbertBrewersConjectureFeasibility2002}, which states that a distributed system can guarantee only two of the following three properties at the same time:
 
 \begin{itemize}
 	\item \textbf{Consistency (C):} Every read receives the most recent write or an error.
@@ -92,8 +92,8 @@ It relaxes ACID constraints to gain performance and scalability, making it less 
 % NOTE: Comparison of MobilityDB and CrateDB
 % Citations for the support of the queries: https://www.perplexity.ai/search/which-of-these-queries-is-supp-n5CXpQokRBW2lIHKPA0yLg
 Additionally, the differences between \mobilitydbc~and CrateDB can be seen by the available complex queries in \mobilitydbc~compared to the possibilities of CrateDB.
-\mobilitydbc~has comprehensive support for spatiotemporal queries, including complex queries such as spatiotemporal joins and k-nearest neighbor queries \cite{bakliDistributedSpatiotemporalTrajectory2020,QueryingDataMobilitydbDocs}.
-On the other hand CrateDB focuses on the real-time analytics and horizontal scalability, which makes it a better solution for IoT devices and real-time analytics \cite{CrateDBDocumentation}.
+\mobilitydbc~has comprehensive support for spatiotemporal queries, including complex queries such as spatiotemporal joins and k-nearest neighbor queries \parencite{bakliDistributedSpatiotemporalTrajectory2020} \footcite{QueryingDataMobilitydbDocs}.
+On the other hand CrateDB focuses on the real-time analytics and horizontal scalability, which makes it a better solution for IoT devices and real-time analytics \footcite{CrateDBDocumentation}.
 The table \ref{tab:mobilitydb_vs_cratedb} shows the differences between \mobilitydbc~and CrateDB and the queries the systems support.
 \begin{table}[h]
   \centering
@@ -135,4 +135,12 @@ The table \ref{tab:mobilitydb_vs_cratedb} shows the differences between \mobilit
   \label{tab:mobilitydb_vs_cratedb}
 \end{table}
 
-We designed a benchmark by using feature set supported by both database systems.
+\subsection{Benchmarking}
+% TODO: what is a load generator
+% TODO: define micro benchmark
+% TODO: define synthethic workload generator
+% TODO: define closed workload generation
+
+% TODO: explain basic ideas of kubernetes: pod, cluster
+
+We designed a benchmark by using feature set supported by both systems under test (SUTs).
