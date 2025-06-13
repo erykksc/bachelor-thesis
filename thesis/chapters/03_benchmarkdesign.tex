@@ -1,64 +1,72 @@
 \section{Benchmark Design}
 \label{cha:benchmarkdesign}
 
-% TODO: Go over all benchmark design aspects and explain the trade offs taken and why
-Based on the book "Cloud Service Benchmarking" by David Bermbach we have identified the 
+% \subsection{Kubernetes explanation}
+%
+% Important aspect of this benchmark was the portability as there was uncertainty where would the experiment be conducted.
+% Three environments had to be taken into account.
+% First, the cloud, initially it was planned to run the experiment on Google Cloud Platform but unfortunately, Google suddenly stopped providing credits for the University.
+% Two, the server cluster of the University, with support for Kubernetes.
+% Our machines, for testing and in case it wouldn't be possible to use different computers.
+%
+% Ultimately we have decided to go with Kubernetes, as it provided a way to run the database systems on all of the three environments, as well as increasing the benchmark relevance, as we assume the production systems are likely gonna be deployed in such environment.
+% Additionally use of Kubernetes increased ease of use, as it is a common solution for distributed systems, along with robustness, as Kubernetes automatically revives dead nodes, allows to easily change replica count and extend the configuration for real life systems.
+%
+% For the data used for the benchmark we decided to use a synthetic data generator that would be run as a pod on the same Kubernetes cluster in order to minimize possible, latency and unknown variables on the network.
 
-\subsection{Reproducibility}
-In order to minimize factors such as network latency and other unknowns I want to put the testing client/load generator as close to the SUT as possible to minimize unknown variables, such as network latency, reliability and interference of other devices.
+In this thesis we compare two DDBMSs, CrateDB and \mobilitydbc to assess their scalability in spatial-temporal workloads typical for IoT usecases. 
+Our goal is not to advocate for one system over the other but to investigate their respective strengths and limitation in processing ST data at scale.
 
-\subsection{Repeatability}
-3 Options
-* Docker images that could be run on multiple hosts, with a script that would configure the nodes
-Kubernetes
-Swarm
+\subsection{Design Objectives}
+The benchmark should be relevant to real-world use cases, especially spatial-temporal workloads.
+We accomplish that by modelling queries after common use cases like, time slice queries, window queries, and spatiotemporal joins.
+We deploy the SUTs on a Kubernetes cluster in Microsoft Azure, resembling common deployment method of companies.
+Such deployment using infrastructure as code, allows us to share the configuration of SUTs, as well as information of provisioned cloud resources, allowing reproducibility of our results.
 
-I'll probably use nix and docker for the load generator to allow recreation of the exact same runtime with the same package versions.
+The decision to choose Kubernetes over shell scripts or other automation tools such as Ansible has reduced understandability (as not everybody is familiar with container orchestration tools such as Kubernetes), but allowed us to improve portability, relevance and simplified development.
+This trade off has been made as unexpectedly because of the cloud infrastructure provider, where we wanted to run the benchmark on initially, cut off credits for the university right before the start of the thesis writing.
+Such change, made us switch to a solution that was more portable. 
+Using containerization, allowed us to develop on single host machine without creating VMs and also made it possible to run our benchmark on other cloud providers or university servers/Kubernetes cluster.
+Furthermore, use of containers improves repeatability as the node will have exact same versions of the software installed on them.
 
-\subsection{Fairness}
-I don't want to focus on specific features where one database system shines (MobilityDB complex queries functionality).
+The SUTs are benchmarked using equivalent conditions ensuring fairness by 
+(1) deploying them on the same cloud resources (processor types, memory, storage, and networking),
+(2) running semantically analogous queries,
+(3) connecting same amount of clients to them, and by
+(3) inserting same amount of data.
+Notably, \mobilitydbc~supports more complex queries than CrateDB and because of that we will benchmark queries supported by both systems.
+We suspect that \mobilitydbc~ being full ACID compliant will result in reduced raw performance, but in this thesis we focus on scalability patterns so are making this trade-off to fairness.
 
-Here I still need to compare both of the systems to select which features are available on both.
+Our benchmark evaluates scalability by measuring how each SUT performs under growing cluster sizes and data volumes.
 
-\subsection{Portability}
-I don't want to test complex query functionality as it is 
-I'm thinking of focusing primarily on write throughput, and read performance, latency.
+\subsection{Quality Metrics}
+To measure scalability we plot the Metric curves over increasing node counts.
+We choose the following metrics for our benchmark
+(1) Latency, it will be measured in milliseconds for both inserts and queries. We will create percentile breakdown (P50,P95, P99) to provide insight into tail latencies.
+(2) Throughput, we will measure the number of records written or queries completed per second.
 
-Should I trade of portability, in sense that this benchmark should exactly match the matching feature set of mobilityDB and CrateDB, or should I already look into other solutions and have greater portability, so that other systems may also be tested?
+In the context of IoT devices, write throughput is important for the devices themselves, and the read latency is important for the users.
+Because of this, the benchmark results should be relevant.
 
-\subsection{Understandability}
-I don't know what to do with the setup, as running the clusters on swarm or Kubernetes would significantly increase the barrier of entry both for me and the readers.
+\subsection{Workload design}
+We adopt a synthetic workload combined with a micro-benchmark approach where each run isolates one quality of system behavior (e.g., write latency, read throughput).
+This avoids confounding metrics and ensures interpretable results.
+We have developed a custom synthetic workload generator, written in Golang, which will issue concurrent requests using lightweight goroutines to simulate a fixed large number of clients.
+Golang has been chosen due to goroutines, which are lightweight threads (~2KB stack vs ~1MB stack when using OS threads) managed by the Go runtime, allowing us to simulate a large number of concurrent clients on a relatively small system.
 
-\subsection{Relevance}
-Write throughput is important for IOT devices, and read latency is important for the users.
+For the write workload we will simulate IoT devices emitting time-stamped spatial data of %TODO: what will the generated data be of?
+We will test batch and single-record inserts at varying ingestion rates to measure write throughput and latency.
 
-I need to balance it out with portability and I'm gonna sacrifice it in favor of portability.
-I have to do it because MobilityDB supports more complex queries than crateDB.
+Whereas for the read workload, we will simulate %TODO: what will we simulate exactly?
+This will be performed by running following queries
+(1) Temporal range queries (e.g., last hour of data per device).
+(2) Spatial bounding box queries (e.g., devices within a bounding box).
+(3) Spatio-temporal window queries (e.g., average speed over 10-minute intervals).
 
-% TODO: Identify quality metrics to be used
+\subsection{Measurement}
+We combined the load generator with the testing client in order for the same goroutine to issues requests as well as to measure their metrics.
+This way we keep the measuring simple and understandable and don't overcomplicate the setup.
 
-% TODO: Identify what to measure, which functionality both databases provide
-
-% TODO: Define measurement methods
-
-% TODO: Define the workload to be used
-% I think I will go with a synthetic workload combined with a micro benchmark strategy in order to test one quality at the time, like write throughput.
-% It is a perfect fit for my solution as it is easy to scale on distributed systems.
-% I'm gonna do an closed workload generation on fixed amount of client nodes,  in order to test how many clients the db can handle.
-
-
-% TODO: Implementation aspects
-
-
-\subsection{Kubernetes explanation}
-
-Important aspect of this benchmark was the portability as there was uncertainty where would the experiment be conducted.
-Three environments had to be taken into account.
-First, the cloud, initially it was planned to run the experiment on Google Cloud Platform but unfortunately, Google suddenly stopped providing credits for the University.
-Two, the server cluster of the University, with support for Kubernetes.
-Our machines, for testing and in case it wouldn't be possible to use different computers.
-
-Ultimately we have decided to go with Kubernetes, as it provided a way to run the database systems on all of the three environments, as well as increasing the benchmark relevance, as we assume the production systems are likely gonna be deployed in such environment.
-Additionally use of Kubernetes increased ease of use, as it is a common solution for distributed systems, along with robustness, as Kubernetes automatically revives dead nodes, allows to easily change replica count and extend the configuration for real life systems.
-
-For the data used for the benchmark we decided to use a synthetic data generator that would be run as a pod on the same Kubernetes cluster in order to minimize possible, latency and unknown variables on the network.
+In order to minimize unknown variables, such as network latency, reliability, and interference of other devices, we put the load generator on the same Kubernetes cluster.
+The load generator pod runs on a separate Kubernetes node, a different host machine, isolated from database nodes to prevent influencing SUT performance.
+During the evaluation we monitor the resource usage of every node, focusing on the load generator in order to prevent it from becoming a bottleneck in the benchmark.
