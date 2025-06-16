@@ -1,0 +1,95 @@
+{{- if .Values.rbac.create }}
+# ---------------------------
+# Manager RBAC
+# ---------------------------
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "mobilitydbc-benchmark.fullname" . }}-manager-sa
+  labels:
+    {{- include "mobilitydbc-benchmark.labels" . | nindent 4 }}
+    component: manager
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "mobilitydbc-benchmark.fullname" . }}-manager-role
+  labels:
+    {{- include "mobilitydbc-benchmark.labels" . | nindent 4 }}
+    component: manager
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "mobilitydbc-benchmark.fullname" . }}-manager-binding
+  labels:
+    {{- include "mobilitydbc-benchmark.labels" . | nindent 4 }}
+    component: manager
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "mobilitydbc-benchmark.fullname" . }}-manager-role
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "mobilitydbc-benchmark.fullname" . }}-manager-sa
+---
+{{- end }}
+# ---------------------------
+# Manager Deployment
+# ---------------------------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "mobilitydbc-benchmark.fullname" . }}-manager
+  labels:
+    {{- include "mobilitydbc-benchmark.labels" . | nindent 4 }}
+    component: manager
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "mobilitydbc-benchmark.selectorLabels" . | nindent 6 }}
+      component: manager
+  template:
+    metadata:
+      labels:
+        {{- include "mobilitydbc-benchmark.selectorLabels" . | nindent 8 }}
+        component: manager
+    spec:
+      {{- if .Values.rbac.create }}
+      serviceAccountName: {{ include "mobilitydbc-benchmark.fullname" . }}-manager-sa
+      {{- end }}
+      containers:
+        - name: manager
+          image: "{{ .Values.manager.image.repository }}:{{ .Values.manager.image.tag }}"
+          imagePullPolicy: {{ .Values.manager.image.pullPolicy }}
+          env:
+            - name: CITUS_HOST
+              value: {{ include "mobilitydbc-benchmark.fullname" . }}-coordinator
+            - name: POSTGRES_PASSWORD
+              value: {{ .Values.postgres.password | quote }}
+            - name: POSTGRES_USER
+              value: {{ .Values.postgres.user | quote }}
+            - name: POSTGRES_DB
+              value: {{ .Values.postgres.database | quote }}
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+          volumeMounts:
+            - name: healthcheck
+              mountPath: /healthcheck
+          readinessProbe:
+            exec:
+              command:
+                - cat
+                - /healthcheck/manager-ready
+            initialDelaySeconds: 5
+            periodSeconds: 10
+      volumes:
+        - name: healthcheck
+          emptyDir: {}
