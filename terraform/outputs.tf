@@ -1,19 +1,20 @@
 output "cluster_endpoint" {
-  description = "EKS cluster endpoint"
-  value       = module.eks.cluster_endpoint
+  description = "AKS cluster endpoint"
+  value       = azurerm_kubernetes_cluster.main.kube_config.0.host
+  sensitive   = true
 }
 
 output "cluster_name" {
-  description = "EKS cluster name"
-  value       = module.eks.cluster_name
+  description = "AKS cluster name"
+  value       = azurerm_kubernetes_cluster.main.name
 }
 
-output "region" {
-  description = "AWS region"
-  value       = var.aws_region
+output "location" {
+  description = "Azure location"
+  value       = var.azure_location
 }
 
 output "kubectl_config_command" {
   description = "Command to configure kubectl"
-  value       = "aws eks update-kubeconfig --region ${var.aws_region} --name ${module.eks.cluster_name}"
+  value       = "az aks get-credentials --resource-group ${azurerm_resource_group.main.name} --name ${azurerm_kubernetes_cluster.main.name}"
 }
