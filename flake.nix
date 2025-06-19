@@ -1,12 +1,12 @@
 {
-  description =
-    "An empty flake template that you can adapt to your own environment";
+  description = "An empty flake template that you can adapt to your own environment";
 
   # Flake inputs
   inputs.nixpkgs.url = "https://flakehub.com/f/NixOS/nixpkgs/0.1";
 
   # Flake outputs
-  outputs = inputs:
+  outputs =
+    inputs:
     let
       # The systems supported for this flake
       supportedSystems = [
@@ -17,34 +17,43 @@
       ];
 
       # Helper to provide system-specific attributes
-      forEachSupportedSystem = f:
-        inputs.nixpkgs.lib.genAttrs supportedSystems (system:
+      forEachSupportedSystem =
+        f:
+        inputs.nixpkgs.lib.genAttrs supportedSystems (
+          system:
           f {
             pkgs = import inputs.nixpkgs {
               inherit system;
               config.allowUnfree = true;
             };
-          });
-    in {
-      devShells = forEachSupportedSystem ({ pkgs }: {
-        default = pkgs.mkShell {
-          # The Nix packages provided in the environment
-          # Add any you need here
-          packages = with pkgs; [
-            awscli2
-            gnumake
-            kubectl
-            kubernetes-helm
-            terraform
-            texliveFull
-          ];
+          }
+        );
+    in
+    {
+      devShells = forEachSupportedSystem (
+        { pkgs }:
+        {
+          default = pkgs.mkShell {
+            # The Nix packages provided in the environment
+            # Add any you need here
+            packages = with pkgs; [
+              azure-cli
+              gnumake
+              kubectl
+              kubernetes-helm
+              nixfmt-rfc-style
+              opentofu
+              tectonic
+              texliveFull
+            ];
 
-          # Set any environment variables for your dev shell
-          env = { };
+            # Set any environment variables for your dev shell
+            env = { };
 
-          # Add any shell logic you want executed any time the environment is activated
-          shellHook = "";
-        };
-      });
+            # Add any shell logic you want executed any time the environment is activated
+            shellHook = "";
+          };
+        }
+      );
     };
 }
