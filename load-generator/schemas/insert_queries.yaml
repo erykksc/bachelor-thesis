@@ -1,0 +1,112 @@
+insert_queries:
+  - name: InsertVehicleEvent
+    description: Insert a single vehicle event record into vehicle_events table.
+    parameters:
+      - name: EventID
+        type: uuid
+      - name: TripID
+        type: uuid
+      - name: Timestamp
+        type: timestamp
+      - name: Longitude
+        type: float
+      - name: Latitude
+        type: float
+    cratedb_sql: |
+      INSERT INTO vehicle_events (
+          event_id,
+          trip_id,
+          timestamp,
+          geo_point
+      )
+      VALUES (
+          '{{.EventID}}',
+          '{{.TripID}}',
+          '{{.Timestamp}}',
+          [{{.Longitude}}, {{.Latitude}}]
+      );
+    mobilitydb_sql: |
+      INSERT INTO vehicle_events (
+          event_id,
+          trip_id,
+          timestamp,
+          geom
+      )
+      VALUES (
+          '{{.EventID}}',
+          '{{.TripID}}',
+          '{{.Timestamp}}',
+          ST_SetSRID(ST_MakePoint({{.Longitude}}, {{.Latitude}}), 4326)
+      );
+
+  - name: InsertPOI
+    description: Insert a single point-of-interest record into pois table.
+    parameters:
+      - name: POIID
+        type: uuid
+      - name: Name
+        type: text
+      - name: Category
+        type: text
+      - name: Longitude
+        type: float
+      - name: Latitude
+        type: float
+    cratedb_sql: |
+      INSERT INTO pois (
+          poi_id,
+          name,
+          category,
+          geo_point
+      )
+      VALUES (
+          '{{.POIID}}',
+          '{{.Name}}',
+          '{{.Category}}',
+          [{{.Longitude}}, {{.Latitude}}]
+      );
+    mobilitydb_sql: |
+      INSERT INTO pois (
+          poi_id,
+          name,
+          category,
+          geom
+      )
+      VALUES (
+          '{{.POIID}}',
+          '{{.Name}}',
+          '{{.Category}}',
+          ST_SetSRID(ST_MakePoint({{.Longitude}}, {{.Latitude}}), 4326)
+      );
+
+  - name: InsertDistrict
+    description: Insert a single district polygon into districts table.
+    parameters:
+      - name: DistrictID
+        type: uuid
+      - name: Name
+        type: text
+      - name: GeoJSON
+        type: geojson
+    cratedb_sql: |
+      INSERT INTO districts (
+          district_id,
+          name,
+          geo_shape
+      )
+      VALUES (
+          '{{.DistrictID}}',
+          '{{.Name}}',
+          '{{.GeoJSON}}'
+      );
+    mobilitydb_sql: |
+      INSERT INTO districts (
+          district_id,
+          name,
+          geom
+      )
+      VALUES (
+          '{{.DistrictID}}',
+          '{{.Name}}',
+          ST_GeomFromGeoJSON('{{.GeoJSON}}')
+      );
