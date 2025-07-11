@@ -1,21 +1,20 @@
-{{- if .Values.rbac.create }}
 # ---------------------------
 # Manager RBAC
 # ---------------------------
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: {{ include "mobilitydbc-benchmark.fullname" . }}-manager-sa
+  name: {{ include "mobilitydbc-cluster.fullname" . }}-manager-sa
   labels:
-    {{- include "mobilitydbc-benchmark.labels" . | nindent 4 }}
+    {{- include "mobilitydbc-cluster.labels" . | nindent 4 }}
     component: manager
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: {{ include "mobilitydbc-benchmark.fullname" . }}-manager-role
+  name: {{ include "mobilitydbc-cluster.fullname" . }}-manager-role
   labels:
-    {{- include "mobilitydbc-benchmark.labels" . | nindent 4 }}
+    {{- include "mobilitydbc-cluster.labels" . | nindent 4 }}
     component: manager
 rules:
   - apiGroups: [""]
@@ -25,51 +24,48 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: {{ include "mobilitydbc-benchmark.fullname" . }}-manager-binding
+  name: {{ include "mobilitydbc-cluster.fullname" . }}-manager-binding
   labels:
-    {{- include "mobilitydbc-benchmark.labels" . | nindent 4 }}
+    {{- include "mobilitydbc-cluster.labels" . | nindent 4 }}
     component: manager
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: {{ include "mobilitydbc-benchmark.fullname" . }}-manager-role
+  name: {{ include "mobilitydbc-cluster.fullname" . }}-manager-role
 subjects:
   - kind: ServiceAccount
-    name: {{ include "mobilitydbc-benchmark.fullname" . }}-manager-sa
+    name: {{ include "mobilitydbc-cluster.fullname" . }}-manager-sa
 ---
-{{- end }}
 # ---------------------------
 # Manager Deployment
 # ---------------------------
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "mobilitydbc-benchmark.fullname" . }}-manager
+  name: {{ include "mobilitydbc-cluster.fullname" . }}-manager
   labels:
-    {{- include "mobilitydbc-benchmark.labels" . | nindent 4 }}
+    {{- include "mobilitydbc-cluster.labels" . | nindent 4 }}
     component: manager
 spec:
   replicas: 1
   selector:
     matchLabels:
-      {{- include "mobilitydbc-benchmark.selectorLabels" . | nindent 6 }}
+      {{- include "mobilitydbc-cluster.selectorLabels" . | nindent 6 }}
       component: manager
   template:
     metadata:
       labels:
-        {{- include "mobilitydbc-benchmark.selectorLabels" . | nindent 8 }}
+        {{- include "mobilitydbc-cluster.selectorLabels" . | nindent 8 }}
         component: manager
     spec:
-      {{- if .Values.rbac.create }}
-      serviceAccountName: {{ include "mobilitydbc-benchmark.fullname" . }}-manager-sa
-      {{- end }}
+      serviceAccountName: {{ include "mobilitydbc-cluster.fullname" . }}-manager-sa
       containers:
         - name: manager
-          image: "{{ .Values.manager.image.repository }}:{{ .Values.manager.image.tag }}"
-          imagePullPolicy: {{ .Values.manager.image.pullPolicy }}
+          image: "ghcr.io/erykksc/citus-k8s-manager:latest"
+          imagePullPolicy: Always 
           env:
             - name: CITUS_HOST
-              value: {{ include "mobilitydbc-benchmark.fullname" . }}-coordinator
+              value: {{ include "mobilitydbc-cluster.fullname" . }}-coordinator
             - name: POSTGRES_PASSWORD
               value: {{ .Values.postgres.password | quote }}
             - name: POSTGRES_USER
@@ -80,6 +76,8 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
+            - name: LABEL_SELECTOR
+              value: "{{- include "mobilitydbc-cluster.selectorLabelsCSV" . }},component=worker"
           volumeMounts:
             - name: healthcheck
               mountPath: /healthcheck
@@ -93,3 +91,5 @@ spec:
       volumes:
         - name: healthcheck
           emptyDir: {}
+      affinity:
+        {{- toYaml .Values.manager.affinity | nindent 8 }}

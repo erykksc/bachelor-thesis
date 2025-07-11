@@ -7,7 +7,7 @@ variable "azure_location" {
 variable "cluster_name" {
   description = "AKS cluster name"
   type        = string
-  default     = "ba-benchmark"
+  default     = "thesis-aks-cluster"
 }
 
 variable "aks_node_count" {

@@ -26,32 +26,40 @@
               inherit system;
               config.allowUnfree = true;
             };
+            system = system;
           }
         );
     in
     {
+
+      packages = forEachSupportedSystem (
+        { pkgs, system }:
+        {
+          devEnv = pkgs.buildEnv {
+            name = "bachelor-thesis-dev-env";
+            paths = [
+              pkgs.azure-cli
+              pkgs.gnumake
+              pkgs.kubectl
+              pkgs.kubernetes-helm
+              pkgs.nixfmt-rfc-style
+              pkgs.opentofu
+              pkgs.postgresql_17
+              pkgs.tectonic
+              pkgs.texliveFull
+              pkgs.uv
+            ];
+          };
+        }
+      );
+
       devShells = forEachSupportedSystem (
-        { pkgs }:
+        { pkgs, system }:
         {
           default = pkgs.mkShell {
-            # The Nix packages provided in the environment
-            # Add any you need here
             packages = with pkgs; [
-              azure-cli
-              gnumake
-              kubectl
-              kubernetes-helm
-              nixfmt-rfc-style
-              opentofu
-              tectonic
-              texliveFull
+              inputs.self.packages.${system}.devEnv
             ];
-
-            # Set any environment variables for your dev shell
-            env = { };
-
-            # Add any shell logic you want executed any time the environment is activated
-            shellHook = "";
           };
         }
       );

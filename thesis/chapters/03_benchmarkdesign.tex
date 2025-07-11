@@ -14,7 +14,7 @@
 %
 % For the data used for the benchmark we decided to use a synthetic data generator that would be run as a pod on the same Kubernetes cluster in order to minimize possible, latency and unknown variables on the network.
 
-In this thesis we compare two DDBMSs, CrateDB and \mobilitydbc to assess their scalability in spatial-temporal workloads typical for IoT usecases. 
+In this thesis we compare two DDBMSs, CrateDB and \mobilitydbc to assess their scalability in spatial-temporal workloads typical for IoT usecases.
 Our goal is not to advocate for one system over the other but to investigate their respective strengths and limitation in processing ST data at scale.
 
 \subsection{Design Objectives}
@@ -25,11 +25,11 @@ Such deployment using infrastructure as code, allows us to share the configurati
 
 The decision to choose Kubernetes over shell scripts or other automation tools such as Ansible has reduced understandability (as not everybody is familiar with container orchestration tools such as Kubernetes), but allowed us to improve portability, relevance and simplified development.
 This trade off has been made as unexpectedly because of the cloud infrastructure provider, where we wanted to run the benchmark on initially, cut off credits for the university right before the start of the thesis writing.
-Such change, made us switch to a solution that was more portable. 
+Such change, made us switch to a solution that was more portable.
 Using containerization, allowed us to develop on single host machine without creating VMs and also made it possible to run our benchmark on other cloud providers or university servers/Kubernetes cluster.
 Furthermore, use of containers improves repeatability as the node will have exact same versions of the software installed on them.
 
-The SUTs are benchmarked using equivalent conditions ensuring fairness by 
+The SUTs are benchmarked using equivalent conditions ensuring fairness by
 (1) deploying them on the same cloud resources (processor types, memory, storage, and networking),
 (2) running semantically analogous queries,
 (3) connecting same amount of clients to them, and by
@@ -50,8 +50,7 @@ Because of this, the benchmark results should be relevant.
 
 \subsection{Workload design}
 We adopt a synthetic workload combined with a micro-benchmark approach where each run isolates one quality of system behavior (e.g., write latency, read throughput).
-This avoids confounding metrics and ensures interpretable results.
-We have developed a custom synthetic workload generator, written in Golang, which will issue concurrent requests using lightweight goroutines to simulate a fixed large number of clients.
+This avoids confounding metrics and ensures interpretable results. We have developed a custom synthetic workload generator, written in Golang, which will issue concurrent requests using lightweight goroutines to simulate a fixed large number of clients.
 Golang has been chosen due to goroutines, which are lightweight threads (~2KB stack vs ~1MB stack when using OS threads) managed by the Go runtime, allowing us to simulate a large number of concurrent clients on a relatively small system.
 
 For the write workload we will simulate IoT devices emitting time-stamped spatial data of %TODO: what will the generated data be of?

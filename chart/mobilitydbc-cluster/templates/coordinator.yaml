@@ -4,13 +4,13 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "mobilitydbc-benchmark.fullname" . }}-coordinator
+  name: {{ include "mobilitydbc-cluster.fullname" . }}-coordinator
   labels:
-    {{- include "mobilitydbc-benchmark.labels" . | nindent 4 }}
+    {{- include "mobilitydbc-cluster.labels" . | nindent 4 }}
     component: coordinator
 spec:
   selector:
-    {{- include "mobilitydbc-benchmark.selectorLabels" . | nindent 4 }}
+    {{- include "mobilitydbc-cluster.selectorLabels" . | nindent 4 }}
     component: coordinator
   ports:
     - port: {{ .Values.service.port }}
@@ -24,27 +24,27 @@ spec:
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: {{ include "mobilitydbc-benchmark.fullname" . }}-coordinator
+  name: {{ include "mobilitydbc-cluster.fullname" . }}-coordinator
   labels:
-    {{- include "mobilitydbc-benchmark.labels" . | nindent 4 }}
+    {{- include "mobilitydbc-cluster.labels" . | nindent 4 }}
     component: coordinator
 spec:
-  serviceName: {{ include "mobilitydbc-benchmark.fullname" . }}-coordinator
+  serviceName: {{ include "mobilitydbc-cluster.fullname" . }}-coordinator
   replicas: {{ .Values.coordinator.replicas }}
   selector:
     matchLabels:
-      {{- include "mobilitydbc-benchmark.selectorLabels" . | nindent 6 }}
+      {{- include "mobilitydbc-cluster.selectorLabels" . | nindent 6 }}
       component: coordinator
   template:
     metadata:
       labels:
-        {{- include "mobilitydbc-benchmark.selectorLabels" . | nindent 8 }}
+        {{- include "mobilitydbc-cluster.selectorLabels" . | nindent 8 }}
         component: coordinator
     spec:
       containers:
         - name: coordinator
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          image: "ghcr.io/erykksc/citus-mobilitydb:latest"
+          imagePullPolicy: Always 
           env:
             - name: POSTGRES_PASSWORD
               value: {{ .Values.postgres.password | quote }}

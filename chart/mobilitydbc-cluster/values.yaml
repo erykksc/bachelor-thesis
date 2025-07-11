@@ -1,22 +1,11 @@
-# Default values for mobilitydbc-benchmark
+# Default values for mobilitydbc-cluster
 nameOverride: ""
 fullnameOverride: ""
-
-image:
-  repository: ghcr.io/erykksc/citus-mobilitydb
-  tag: latest
-  pullPolicy: IfNotPresent
-
-manager:
-  image:
-    repository: ghcr.io/erykksc/citus-mobilitydb-manager
-    tag: latest
-    pullPolicy: IfNotPresent
 
 coordinator:
   replicas: 1
   resources: {}
-  # Anti-affinity to ensure coordinator runs on separate node
+  # Anti-affinity to ensure coordinator runs on separate node from workers only
   affinity:
     podAntiAffinity:
       requiredDuringSchedulingIgnoredDuringExecution:
@@ -24,11 +13,22 @@ coordinator:
             matchExpressions:
               - key: component
                 operator: In
-                values: ["coordinator", "worker"]
+                values: ["worker"]
+          topologyKey: kubernetes.io/hostname
+
+manager:
+  affinity:
+    podAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - labelSelector:
+            matchExpressions:
+              - key: component
+                operator: In
+                values: ["coordinator"]
           topologyKey: kubernetes.io/hostname
 
 worker:
-  replicas: 10
+  replicas: 1
   resources: {}
   # Anti-affinity to ensure each worker runs on separate node
   affinity:
@@ -38,7 +38,7 @@ worker:
             matchExpressions:
               - key: component
                 operator: In
-                values: ["coordinator", "worker"]
+                values: ["manager", "coordinator", "worker"]
           topologyKey: kubernetes.io/hostname
 
 postgres:
@@ -50,7 +50,7 @@ service:
   type: ClusterIP
   port: 5432
 
-# RBAC settings
-rbac:
-  create: true
-
+ingress:
+  enabled: false
+  hosts: []
+  tls: false
