@@ -2,8 +2,8 @@
 .nix-profile
 .direnv/
 .envrc
-load-generator/output/
-load-generator/cache/
+dataset-generator/output/
+dataset-generator/cache/
 
 # Terraform/ opentofu
 *.tfstate
