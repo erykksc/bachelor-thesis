@@ -21,3 +21,20 @@ variable "vm_size" {
   type        = string
   default     = "standard_d2ds_v4"
 }
+
+variable "load_generator_vm_size" {
+  description = "Azure VM size for load generator"
+  type        = string
+  default     = "Standard_D2s_v3"
+}
+
+variable "load_generator_admin_username" {
+  description = "Admin username for load generator VM"
+  type        = string
+  default     = "azureuser"
+}
+
+variable "load_generator_ssh_public_key" {
+  description = "SSH public key for load generator VM access"
+  type        = string
+}

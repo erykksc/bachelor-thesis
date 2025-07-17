@@ -4,3 +4,10 @@
 .envrc
 load-generator/output/
 load-generator/cache/
+
+# Terraform/ opentofu
+*.tfstate
+*.tfstate.*
+*.tfvars
+opentofu/.terraform/
+**/*.tofuplan
