@@ -133,7 +133,7 @@ resource "azurerm_network_interface_security_group_association" "load_generator"
 # Separate VM ensures load generation doesn't interfere with AKS cluster performance
 # Provides isolated environment for running benchmark tools against the cluster
 resource "azurerm_linux_virtual_machine" "load_generator" {
-  name                = "${var.cluster_name}-load-generator"
+  name                = "benchmark-load-generator"
   location            = azurerm_resource_group.main.location
   resource_group_name = azurerm_resource_group.main.name
   size                = var.load_generator_vm_size
@@ -161,13 +161,14 @@ resource "azurerm_linux_virtual_machine" "load_generator" {
     storage_account_type = "Premium_LRS"
   }
 
-  # Ubuntu 22.04 LTS - stable, long-term support Linux distribution
-  # Widely used for development and has good tooling support
-  # Gen2 provides better performance and security features
   source_image_reference {
     publisher = "Canonical"
-    offer     = "0001-com-ubuntu-server-jammy"
-    sku       = "22_04-lts-gen2"
+    offer     = "ubuntu-24_04-lts"
+    sku       = "server"
     version   = "latest"
   }
+
+  # Run setup script on first boot
+  custom_data = base64encode(file("${path.module}/setup-vm.sh"))
+
 }

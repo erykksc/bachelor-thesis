@@ -1,13 +1,13 @@
 variable "azure_location" {
   description = "Azure location"
   type        = string
-  default     = "France Central"
+  default     = "West Europe"
 }
 
 variable "cluster_name" {
   description = "AKS cluster name"
   type        = string
-  default     = "thesis-aks-cluster"
+  default     = "benchmark-aks-cluster"
 }
 
 variable "aks_node_count" {
@@ -22,10 +22,11 @@ variable "vm_size" {
   default     = "standard_d2ds_v4"
 }
 
+# by default 4 cores, 16GB of RAM, 150GB of storage (important to fit the dataset)
 variable "load_generator_vm_size" {
   description = "Azure VM size for load generator"
   type        = string
-  default     = "Standard_D2s_v3"
+  default     = "Standard_D4ds_v4"
 }
 
 variable "load_generator_admin_username" {
