@@ -1,10 +1,10 @@
-\section{Benchmark Design}
+\section{Approach}
 \label{cha:benchmarkdesign}
 
-In this thesis we compare two DDBMSs, CrateDB and \mobilitydbc to assess their scalability in spatial-temporal workloads typical for IoT usecases.
-Spatio-temporal aspects are our primary target as the value proposition of \mobilitydbc is exactly that.
-Our goal is not to advocate for one system over the other but to investigate their respective strengths and limitation in processing ST data at scale.
-To evaluate the scalability we have designed a benchmark seen in Figure~\ref{fig:benchmark_design}.
+Our benchmark is designed to investigate how CrateDB and \mobilitydbc compare in terms of scalability under spatio-temporal workloads typical for IoT use cases.
+Spatio-temporal aspects are the primary target of our benchmark, since \mobilitydbc value proposition is exactly that.
+Our goal is not to advocate for one system over the other but to investigate their respective strengths and limitations in processing spatio-temporal (ST) data at scale.
+To evaluate scalability, we have designed a benchmark seen in Figure~\ref{fig:benchmark_design}.
 
 \begin{figure}[ht]
 	\centering
@@ -64,7 +64,7 @@ To evaluate the scalability we have designed a benchmark seen in Figure~\ref{fig
 		\draw[arrow] (cn) -- (w2);
 		\draw[arrow] (cn) -- (w3);
 		% Client to SUT connections
-		\draw[arrow] (db_client) to[bend left=13] node[above] {Queries/Writes} (cn);
+		\draw[arrow] (db_client) to[bend left=13] node[above] {Concurrent Queries/Writes} (cn);
 		\draw[arrow] (cn) to[bend left=5] node[below] {Results} (db_client);
 
 		% Group boxes
@@ -79,93 +79,80 @@ To evaluate the scalability we have designed a benchmark seen in Figure~\ref{fig
 		\end{pgfonlayer}
 	\end{tikzpicture}
 	\caption{
-		Load generator will write generated spatiotemporal data and execute
-		the workload against System Under Test (MobilityDB/CrateDB cluster).
+		Load generator issues synthetic spatio-temporal inserts and queries to a SUT cluster consisting of one master and N worker nodes.
 	}
 	\label{fig:benchmark_design}
 \end{figure}
 
-In the benchmark the load generator will connect with the System Under Test (SUT) and issue queries.
-It will log metrics allowing later analysis of the findings.
-The System Under Test, will be run on the same resources i.e., MobilityDB will be deployed on the same resources as CrateDB.
-The resources for the SUT will be restarted between each benchmark run.
-
-% Things to explain:
-% * this benchmark is designed for cloud
+% Designed for cloud
 \subsection{Infrastructure}
-We design this benchmark to be deployed and run on the cloud for two reasons.
-Firstly, we did not have access to multiple local machines with the same specification to ensure no bottlenecks.
-Secondly, the repeatability and relevance of such approach is improved, as the benchmark can be replicated by other parties without them having access to a collection of devices and cloud deployed systems are a common (CITATION).
+We designed this benchmark to be deployed and run on the cloud for two reasons.
+First, we lacked access to multiple local machines with identical hardware, making resource heterogeneity a concern.
+Second, a cloud-based deployment improves repeatability, as others can reproduce our setup without dedicated hardware.
+Moreover, cloud deployments of distributed databases reflect real-world use cases, making the benchmark more relevant.
 
-% * this benchmark uses infrastructure as code to allow reproducibility
-% * this benchmark each ddbms is run on a Kubernetes cluster
-To improve reproducibility and repeatability all parts of the benchmark are documented in code, this includes the resources deploy on the cloud.
-Using infrastructure as code allows multiple benchmark runs with the exact same configuration without option of skipping checking in some setting on a cloud provider web admin console.
-
-% * explain that both ddbms will be run on the same resources (same vm sizes)
-Using cloud and infrastructure as code allows us to deploy both CrateDB and MobilityDB on the exact same resources with the same configuration of them i.e., same virtual machine types/sizes.
-This allows us to be fair towards both systems and provide them with the same resources.
-
-\subsection{DDBMS cluster}
-Documenting the DDBMS configuration through Kubernetes deployment files ensures that the software will be deployed with the same settings and versions using versioned container images.
-Additionally by using Kubernetes, the benchmark can also be more easily developed on a local systems by using contenerization.
-The local development has been an important consideration as the recent withdraw of google from issuing cloud tokens to our university, lead to uncertainty to where the benchmark will be deployed.
-Kubernetes has been chosen over using bash scripts for installing DDBMS on multiple virtual machines for three reasons.
-(1) It allows easier deployment of a DDBMS cluster, which is beneficial when deploying multiple cluster sizes and resetting their state by destroying them.
-(2) The opportunity to experiment with a new technology also played a role, as we were unfamiliar with working with Kubernetes before.
-(3) Relevancy, as deployment of such clustered DDBMS systems is often done this way in production environments (CITATION HERE)
-
+% infrastructure as code to allow reproducibility
+To improve reproducibility and repeatability, all parts of the benchmark, including cloud resource definitions and software configuration, are expressed in code.
+Using infrastructure as code allows multiple benchmark runs with the exact same configuration eliminating the risk of manual misconfiguration.
+Additionally, systems having access to the identical resources makes the benchmark and comparison fair.
 
 \subsection{Load generator}
-% * this benchmark uses synthetic workoad load generator
+% * this benchmark uses synthetic workload load generator
 We decided to split the benchmark into two major components, the DDBMS cluster and a load generator.
-Load generator will be a software simulating multiple clients on a DDBMS cluster by using multiple threads.
-It will use a closed synthetic workload generation with fixed user pool with requests with random parameters generated on the fly based on query templates.
-By using a synthetic workload we sacrifice the realism of the application by improving understandability and simplifying the development of the benchmark.
-This approach allows easy data collection, compared to using multiple load generators running on multiple hosts and makes the benchmark cheaper to run.
-We believe this strategy is viable, as the load generator primarily issues requests, which are i/o heavy, so the performance of the computer running the software shouldn't be a bottleneck.
+The load generator simulates concurrent clients on a DDBMS cluster.
+It uses a  synthetic micro benchmark workload with fixed user pool.
 Simulating multiple clients at the same time strives to mimic the IOT workload where there are many devices issuing requests at the same time.
-% * this benchmark load generator is placed on the same VPC in the cloud as the cluster with running DDBMS
-The load generator is also put on the cloud in the same virtual private cloud (VPC) as the DDBMS cluster.
-Putting the load generator next to the SUT instead of running it on our local computer allows us to minimize latency and potential disturbances while the benchmark runs i.e., packages dropped due to network problems.
+The data for the inserts is generated before the load generator runs, and the queries are generated on runtime.
 
+By using a micro-benchmark workload, we sacrifice the realism of the application to improve understandability, simplify the development, and interpretability of the results.
+We chose synthetic workloads to isolate system behavior and control variability by issuing similar queries and inserts.
+While this reduces workload realism, it improves reproducibility and allows clearer attribution of performance effects.
+
+Load generator is deployed in the cloud as well, close to the SUT instead of running it locally and sending queries through the internet.
+This approach allows us to minimize latency and potential disturbances while the benchmark runs i.e., packet loss due to network problems.
+
+\subsection{DDBMS Clusters}
+
+Each DDBMS is deployed on a cluster of machines with the same specifications that meet or exceed each system's minimum requirements.
+This allows fair comparison of both systems as they have access to same resources.
+The infrastructure of the cluster is deployed in the cloud using infrastructure as code and the DDBMS is deployed on the infrastructure using an automation tool.
+Using an automation tool allows repeatable deployment of the DDBMS in the same way as infrastructure as code allows repeatable deployment of the resources.
 
 \subsection{Workloads and metrics}
 % * explain which metrics have been chosen and why:
 %   - latency
 %   - throughput
 %   - success rate (to see whether the system answers all queries and doesn't drop them)
-During the benchmark run, the load generator will log the following metrics for the analysis afterwards:
-(1) Latency in milliseconds between sending the request to DDBMS and receiving a response.
-(2) Whether the request/query has been resolved successfully or not.
-This allows us to avoid a situation where one SUT would perform better by rejecting multiple queries.
-(3) Throughput, by logging how many queries have been sent and the total time it took to do it, we will calculate the throughput.
-We chose this metric as it is an important in IOT devices as they are commonly deployed in great amounts and send a lot of data i.e., shareable e-scooters in a city which report their location and status.
+During the benchmark run, the load generator measures the following metrics for the analysis afterwards:
+(1) Latency - measured in milliseconds between sending the request to DDBMS and receiving a response from SUT,
+(2) Success rate - this allows us to avoid a situation where one SUT would perform better by rejecting multiple queries,
+(3) Throughput, by logging how many queries have been sent and the total time it took to do it, we calculate the throughput.
 
+Latency and throughput were selected as primary metrics due to their relevance in real-time and high-volume IoT scenarios.
+A system is considered to scale effectively if throughput increases sub-linearly or better with cluster size, and latency remains within acceptable bounds under increasing load.\cite{hossfeldComparingScalabilityCommunication2023}
+Furthermore, throughput is important for IoT deployments as they are commonly deployed in large quantities and send a numerous inserts i.e., e-scooters deployed in a city which report their location and status.
 
 % * explain which benchmark modes? will be tested and why 
 %   - inserts - very realistic for iot usage where a lot of devices share their state/location
-We have identified three scenarios for the SUT which we will test.
-(1) Data insertion, a scenario where the clients will be sending data to insert to the DDBMS.
-By this we want to benchmark how the SUT will perform when multiple clients try insert data i.e., e-scooters deployed in a city reporting their status and location.
-Here we find the write throughput metric extremely relevant. (CITY SOME SOURCE)
+Moreover, we have identified three scenarios for the SUT which we plan to benchmark:
+(1) Data insertion, a scenario where the clients send data to insert to the DDBMS.
+By this we want to benchmark how the SUT performs when multiple clients insert data i.e., e-scooters deployed in a city reporting their status and location.
+Here we find the write throughput metric extremely relevant.
 % * explain which benchmark modes? will be tested and why 
-%   - simple queries - important for real time usecases, like users of an app (finding the closest e-scooter)
+%   - simple queries - important for real time use cases, like users of an app (finding the closest e-scooter)
 (2) Simple read queries, in this scenario we try to simulate queries done by the users of a system i.e., people using the e-scooter app to find the closest e-scooters.
 In this scenario we benchmark the read throughput, as it is a relevant metric for the clients of the system.
-% * explain which benchmark modes? will be tested and why 
+% * explain which benchmark modes? will be teste and why 
 %   - complex queries - important for data analysis, to find out patterns and optimizations (e.g.,used by the e-scooter sharing company)
 (3) Complex read queries, here we try to simulate a scenario of a complex queries used for analysis and optimizations i.e., queries done by the e-scooter company to find patterns in the traffic to optimize the placement of the e-scooter stations throughout a city or to gain insight into their data.
 
 \subsection{Scalability}
 % NOTE: multiple sizes of the cluster will be used (2,3,4,5) to establish scalability pattern
-To establish a scalability pattern multiple sizes of a cluster will be run to evaluate the horizontal scalability.
-For each cluster size we run a benchmark of \mobilitydbc and CrateDB.
+To establish a scalability pattern we vary cluster sizes to evaluate the horizontal scalability.
+Each cluster size is benchmarked using several user pool sizes, simulating different concurrency levels.
+Benchmarking the DDBMS using different client counts allow us to check whether the performance of the queries is improved, such as the response time, or the amount of simultaneous connections handled with acceptable latency.
+This may lead to important findings as some companies may value the performance of the queries for their data analysis more than concurrent connections handled.
+On the other hand a different company may prioritize performance for numerous concurrent devices i.e., an e-scooter company having a large fleet of vehicles.
 
-% NOTE: different client amounts, different number of simultaneous connections simulated by the load generator (100, 1000, 10000)
-Not only we will test different cluster sizes, but we will also test a different amount of simultanous client connections.
-The load generator will be able to simulate varying number of them using threads i.e., 1000 and 10000 connections.
-Multiple configurations of amount of clients allow us to check whether the performance of the queries is improved, such as the response time, or the amount of simultaneous connections handled.
-This could lead to important findings as some companies may value the performance of the queries for their data analysis more important compared to the simultaneous connections handled.
-The latter one may be more important for a company where vast amount of IoT devices connect to the DDBMS at the same time.
-
+Through this benchmark design, we aim to uncover scalability patterns of two distributed databases under realistic IoT-inspired workloads.
+The evaluation results will inform system design choices for practitioners building large-scale spatio-temporal data processing pipelines.

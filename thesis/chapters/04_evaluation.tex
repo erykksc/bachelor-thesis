@@ -1,6 +1,27 @@
 \section{Experiment}
 \label{cha:evaluation}
 
+\subsection{Load Generator}
+This approach allows easy data collection, compared to using multiple load generators running on multiple hosts and makes the benchmark cheaper to run.
+We believe this strategy is viable, as the load generator primarily issues requests, which are i/o heavy, so the performance of the computer running the software shouldn't be a bottleneck.
+% * this benchmark load generator is placed on the same VPC in the cloud as the cluster with running DDBMS
+The load generator is also put on the cloud in the same virtual private cloud (VPC) as the DDBMS cluster.
+Putting the load generator next to the SUT instead of running it on our local computer allows us to minimize latency and potential disturbances while the benchmark runs i.e., packages dropped due to network problems.
+
+
+\subsection{DDBMS cluster}
+We document the DDBMS cluster configuration through Kubernetes deployment files ensuring that the software will be deployed with the same settings and versions using versioned container images.
+Additionally by using Kubernetes, the benchmark can also be more easily developed on local systems by using contenerization.
+The local development has been an important consideration as the recent withdrawal of Google from issuing cloud tokens to our university, lead to uncertainty to where the benchmark will be deployed.
+Kubernetes has been chosen over using bash scripts for installing DDBMS on multiple virtual machines for two reasons.
+(1) It allows easier deployment of a DDBMS cluster, which is beneficial when deploying multiple cluster sizes and resetting their state by destroying them.
+(2) Relevancy, as deployment of such clustered DDBMS systems is often done this way in production environments (CITATION HERE)
+
+In the benchmark the load generator will connect with the System Under Test (SUT) and issue queries.
+It will log metrics allowing later analysis of the findings.
+The System Under Test, will be run on the same resources i.e., MobilityDB will be deployed on the same resources as CrateDB.
+The resources for the SUT will be restarted between each benchmark run to ensure a clean state.
+
 \subsection{Design Objectives}
 The benchmark should be relevant to real-world use cases, especially spatial-temporal workloads as this is the primary value proposition of MobilityDB over other databases.
 We accomplish that by modelling queries after common use cases like, time slice queries, window queries, and spatiotemporal joins.

@@ -1,2 +1,25 @@
-section{Discussion}
+\section{Discussion}
 \label{cha:discussion}
+
+The benchmarked cluster configurations were limited, clusters of bigger sizes should also be evaluated, such as cluster of size 40.
+We were not able to do it due to limited resources and lack of Google Cloud Platform tokens, which have not been issued to the University recently.
+
+One could also run the benchmarks over a larger time frame i.e., running the benchmarks every day or week on different times for a few months.
+This would reduce the variability of the cloud providers systems, as previous research has demonstrated that the time of the day can impact performance of virtual machines hosted on the cloud. (ADD CITATION)
+
+Future research could also look into whether change in the hardware of each node would play a role in scalability i.e., whether improving the hardware of each node in the cluster would influence the scalability patterns.
+
+Wider range of concurrent client connections to the systems could be benchmarked in order to test how do the systems handle even large amount of simultaneous clients.
+This would additionally lead to more reliable findings, as the amount of interpolation between the performance points would be smaller.
+
+Due to time constraint, we additionally were not able to evaluate performance of different query types, such as updates and deletes.
+
+Additionally, the vertical scalability of each system has not been determined and compared.
+
+Furthermore, a more realistic workload could be benchmarked, such as a trace based one instead of micro-benchmark.
+
+The systems would also need to be evaluated when nodes of the DBMS would be running on bare metal servers, not on top of Kubernetes inside docker containers as containerization alongside the Kubernetes overhead could impact the results.
+
+Consistency has not been evaluated, as \mobilitydbc supports ACID compliant transactions and CrateDB guarantees only eventual consistency.
+Future research could check how much time does CrateDB need to get into consistent state.
+One could also evaluate the performance and scalability of \mobilitydbc with transactions and without them.
