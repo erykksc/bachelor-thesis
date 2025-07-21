@@ -1,7 +1,79 @@
 \section{Experiment}
 \label{cha:evaluation}
 
+\subsection{Design Objectives}
+The benchmark should be relevant to real-world use cases, especially spatial-temporal workloads as this is the primary value proposition of MobilityDB over other databases.
+We accomplish that by modelling queries after common use cases like, time slice queries, window queries, and spatiotemporal joins.
+We deploy the SUTs on a Kubernetes cluster in Microsoft Azure, resembling common deployment method of companies.
+Such deployment using infrastructure as code, allows us to share the configuration of SUTs, as well as information of provisioned cloud resources, allowing reproducibility of our results.
 
+The decision to choose Kubernetes over shell scripts or other automation tools such as Ansible has reduced understandability (as not everybody is familiar with container orchestration tools such as Kubernetes), but allowed us to improve portability, relevance and simplified development.
+This trade off has been made as unexpectedly because of the cloud infrastructure provider, where we wanted to run the benchmark on initially, cut off credits for the university right before the start of the thesis writing.
+Such change, made us switch to a solution that was more portable.
+Using containerization, allowed us to develop on single host machine without creating VMs and also made it possible to run our benchmark on other cloud providers or university servers/Kubernetes cluster.
+Furthermore, use of containers improves repeatability as the node will have exact same versions of the software installed on them.
+
+The SUTs are benchmarked using equivalent conditions ensuring fairness by
+(1) deploying them on the same cloud resources (processor types, memory, storage, and networking),
+(2) running semantically analogous queries,
+(3) connecting same amount of clients to them, and by
+(3) inserting same amount of data.
+Notably, \mobilitydbc~supports more complex queries than CrateDB and because of that we will benchmark queries supported by both systems.
+We suspect that \mobilitydbc~ being full ACID compliant will result in reduced raw performance, but in this thesis we focus on scalability patterns so are making this trade-off to fairness.
+
+Our benchmark evaluates scalability by measuring how each SUT performs under growing cluster sizes and data volumes.
+
+We decided to benchmark the following sizes for the SUT clusters, 2, 3, 4, and 5.
+Preferably we would benchmark the DDBMS on larger cluster sizes to improve relevance of our findings, but due to resource constrain we choose to do it on a set of small ones to reduce costs.
+Despite the small difference in size between the sizes, we hope to see a pattern which would allow us to create conclusions about scalability.
+
+To check how well the databases handle multiple simultaneous connections and try to find a pattern, we have decided to benchmark the SUT on following number of simultaneous clients 100, 1000, 10000.
+
+% \subsection{Kubernetes explanation}
+%
+% Important aspect of this benchmark was the portability as there was uncertainty where would the experiment be conducted.
+% Three environments had to be taken into account.
+% First, the cloud, initially it was planned to run the experiment on Google Cloud Platform but unfortunately, Google suddenly stopped providing credits for the University.
+% Two, the server cluster of the University, with support for Kubernetes.
+% Our machines, for testing and in case it wouldn't be possible to use different computers.
+%
+% Ultimately we have decided to go with Kubernetes, as it provided a way to run the database systems on all of the three environments, as well as increasing the benchmark relevance, as we assume the production systems are likely gonna be deployed in such environment.
+% Additionally use of Kubernetes increased ease of use, as it is a common solution for distributed systems, along with robustness, as Kubernetes automatically revives dead nodes, allows to easily change replica count and extend the configuration for real life systems.
+%
+% For the data used for the benchmark we decided to use a synthetic data generator that would be run as a pod on the same Kubernetes cluster in order to minimize possible, latency and unknown variables on the network.
+\subsection{Quality Metrics}
+% TODO: Move this entire section to Evaluation chapter - metrics definitions, percentile breakdowns, IoT relevance justification
+To measure scalability we plot the Metric curves over increasing node counts.
+We choose the following metrics for our benchmark
+(1) Latency, it will be measured in milliseconds for both inserts and queries. We will create percentile breakdown (P50,P95, P99) to provide insight into tail latencies.
+(2) Throughput, we will measure the number of records written or queries completed per second.
+
+In the context of IoT devices, write throughput is important for the devices themselves, and the read latency is important for the users.
+Because of this, the benchmark results should be relevant.
+
+\subsection{Workload design}
+% TODO: Move to separate "Workload Design" chapter or merge into Evaluation. Move Go implementation details to Implementation chapter.
+We adopt a synthetic workload combined with a micro-benchmark approach where each run isolates one quality of system behavior (e.g., write latency, read throughput).
+This avoids confounding metrics and ensures interpretable results. We have developed a custom synthetic workload generator, written in Golang, which will issue concurrent requests using lightweight goroutines to simulate a fixed large number of clients.
+Golang has been chosen due to goroutines, which are lightweight threads (~2KB stack vs ~1MB stack when using OS threads) managed by the Go runtime, allowing us to simulate a large number of concurrent clients on a relatively small system.
+
+For the write workload we will simulate IoT devices emitting time-stamped spatial data of %TODO: what will the generated data be of?
+We will test batch and single-record inserts at varying ingestion rates to measure write throughput and latency.
+
+Whereas for the read workload, we will simulate %TODO: what will we simulate exactly?
+This will be performed by running following queries
+(1) Temporal range queries (e.g., last hour of data per device).
+(2) Spatial bounding box queries (e.g., devices within a bounding box).
+(3) Spatio-temporal window queries (e.g., average speed over 10-minute intervals).
+
+\subsection{Measurement}
+% TODO: Move this entire section to Evaluation chapter - measurement methodology, goroutine details, resource monitoring specifics
+We combined the load generator with the testing client in order for the same goroutine to issues requests as well as to measure their metrics.
+This way we keep the measuring simple and understandable and don't overcomplicate the setup.
+
+In order to minimize unknown variables, such as network latency, reliability, and interference of other devices, we put the load generator on the same Kubernetes cluster.
+The load generator pod runs on a separate Kubernetes node, a different host machine, isolated from database nodes to prevent influencing SUT performance.
+During the evaluation we monitor the resource usage of every node, focusing on the load generator in order to prevent it from becoming a bottleneck in the benchmark.
 
 
 

@@ -13,10 +13,13 @@
 \usepackage[a4paper, margin=3cm]{geometry}
 \usepackage[titletoc, title]{appendix}
 
+\usepackage{tikz}
+\usetikzlibrary{shapes,arrows,positioning,fit,backgrounds}
+
 \usepackage{color}
 \usepackage{booktabs}
 \usepackage[all]{nowidow}
-\usepackage[dvipsnames]{xcolor}
+% \usepackage[dvipsnames]{xcolor}
 \usepackage[hidelinks]{hyperref}
 \usepackage{acronym}
 \usepackage{graphicx}
@@ -121,9 +124,11 @@
 \clearpage
 \include{chapters/04_evaluation.tex}
 \clearpage
-\include{chapters/05_relatedwork.tex}
+\include{chapters/05_discussion.tex}
 \clearpage
-\include{chapters/06_conclusion.tex}
+\include{chapters/06_relatedwork.tex}
+\clearpage
+\include{chapters/07_conclusion.tex}
 
 \newpage
 \printbibliography
