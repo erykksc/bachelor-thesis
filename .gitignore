@@ -11,3 +11,14 @@ dataset-generator/cache/
 *.tfvars
 opentofu/.terraform/
 **/*.tofuplan
+
+*.bbl
+*.out
+*.aux
+*.run.xml
+*.log
+*.toc
+*.blg
+*.bcf
+*.synctex.gz
+
