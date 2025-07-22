@@ -60,8 +60,8 @@ spec:
             - -Ccluster.initial_master_nodes={{ .Values.cratedbConfig.discovery.zen.minimumMasterNodes }}
             - -Cdiscovery.seed_providers={{ .Values.cratedbConfig.discovery.zen.hostsProvider }}
             - -Cdiscovery.srv.query=_crate-internal._tcp.{{ .Values.internalService.name }}.${NAMESPACE}.svc.cluster.local
-            - -Cgateway.recover_after_nodes={{ .Values.cratedbConfig.discovery.recoverAfterNodes }}
-            - -Cgateway.expected_nodes=${EXPECTED_NODES}
+            - -Cgateway.recover_after_data_nodes={{ .Values.cratedbConfig.discovery.recoverAfterDataNodes }}
+            - -Cgateway.expected_data_nodes=${EXPECTED_DATA_NODES}
             - -Chttp.cors.allow-origin={{ .Values.http.cors.allowOrigin }}
             - -Chttp.cors.enabled={{ .Values.http.cors.enabled }}
             - -Cpath.data={{ .Values.cratedbConfig.dataPath }}
@@ -86,7 +86,7 @@ spec:
                   fieldPath: metadata.name
             - name: CRATE_HEAP_SIZE
               value: "{{ .Values.heapSize }}"
-            - name: EXPECTED_NODES
+            - name: EXPECTED_DATA_NODES
               value: "{{ .Values.clusterSize }}"
             - name: CLUSTER_NAME
               value: {{ .Values.clusterName }}
