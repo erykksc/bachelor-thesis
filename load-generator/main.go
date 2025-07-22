@@ -38,7 +38,7 @@ type QueryParam struct {
 }
 
 type POI struct {
-	POIID     string
+	POIID     string //UUID
 	Name      string
 	Category  string
 	Longitude string // stored as strings in order not to lose precision compared to CSV file
@@ -57,9 +57,9 @@ func (d District) String() string {
 
 // not parsed to correct data types to increase performance
 type TripEvent struct {
-	EventID   string
-	TripID    string
-	Timestamp string
+	EventID   string // UUID
+	TripID    string // UUID
+	Timestamp string // ISO timestamp
 	Latitude  string
 	Longitude string
 }
@@ -91,18 +91,25 @@ func main() {
 	defer stop()
 	// CLI flags
 	var (
-		dbTargetStr   = flag.String("db", "cratedb", "Target database: cratedb or mobilitydb")
-		districtsPath = flag.String("districts", "../dataset-generator/output/berlin-districts.geojson", "Path to a file containing districts")
-		poisPath      = flag.String("pois", "../dataset-generator/output/berlin-pois.csv", "Path to a file containing POIs")
-		tripsPath     = flag.String("trips", "../dataset-generator/output/escooter-trips-small.csv", "Path to a CSV file containing the escooter trip events")
-		ddlPath       = flag.String("ddl", "../dataset-generator/schemas/cratedb-ddl.sql", "File containing the DDL for creating database tables")
-		mode          = flag.String("mode", "insert", "Mode: insert or query")
-		numWorkers    = flag.Int("nworkers", 100, "Number of simultanious workers for the benchmark to use")
+		dbTargetStr        = flag.String("db", "cratedb", "Target database: cratedb or mobilitydb")
+		districtsPath      = flag.String("districts", "../dataset-generator/output/berlin-districts.geojson", "Path to a file containing districts")
+		poisPath           = flag.String("pois", "../dataset-generator/output/berlin-pois.csv", "Path to a file containing POIs")
+		tripsPath          = flag.String("trips", "../dataset-generator/output/escooter-trips-small.csv", "Path to a CSV file containing the escooter trip events")
+		ddlPath            = flag.String("ddl", "./schemas/cratedb-ddl.sql", "File containing the DDL for creating database tables")
+		mode               = flag.String("mode", "insert", "Mode: insert or query")
+		numWorkers         = flag.Int("nworkers", 100, "Number of simultanious workers for the benchmark to use")
+		skipInitialization = flag.Bool("skip-init", false, "Skip database initialization (creating tables, inserting POIs, and districts")
+		logDebug           = flag.Bool("log-debug", false, "Turn on the DEBUG level for logging")
 	)
 	flag.Parse()
 
-	handler := slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
-		Level: slog.LevelDebug,
+	level := slog.LevelInfo
+	if *logDebug {
+		level = slog.LevelDebug
+	}
+
+	handler := slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+		Level: level,
 	})
 	logger = slog.New(handler)
 
@@ -129,13 +136,17 @@ func main() {
 	// readQueries := mustLoadReadQueries(filepath.Join(*schemasPath, "read-queries.yaml"))
 	// logger.Info("Loaded read queries templates", "count", len(readQueries))
 
-	ddlB, err := os.ReadFile(*ddlPath)
-	if err != nil {
-		logger.Error("Error reading DDL file", "error", err)
-		os.Exit(1)
+	if *skipInitialization {
+		logger.Info("Skipping initialization because of the CLI flag")
+	} else {
+		ddlB, err := os.ReadFile(*ddlPath)
+		if err != nil {
+			logger.Error("Error reading DDL file", "error", err)
+			os.Exit(1)
+		}
+		ddl := string(ddlB)
+		mustInitializeDb(ctx, connString, dbTarget, pois, districts, ddl)
 	}
-	ddl := string(ddlB)
-	mustInitializeDb(ctx, connString, dbTarget, pois, districts, ddl)
 
 	switch *mode {
 	case "insert":
@@ -151,6 +162,7 @@ func main() {
 }
 
 func mustInitializeDb(ctx context.Context, connString string, dbTarget DBTarget, pois []POI, districts []District, ddl string) {
+	logger.Info("Initializing Database", "databaseType", dbTarget, "connString", connString, "poiCount", len(pois), "districtCount", len(districts))
 	mustInsertPoiToDb := mustInsertPoiToCratedb
 	mustInsertDistrictToDb := mustInsertDistrictToCratedb
 
@@ -165,8 +177,6 @@ func mustInitializeDb(ctx context.Context, connString string, dbTarget DBTarget,
 		mustInsertPoiToDb = mustInsertPoiToMobilitydb
 		mustInsertDistrictToDb = mustInsertDistrictToMobilitydb
 	}
-
-	logger.Info("Loaded database specific Data Definition Language (DDL)", "forDatabase", dbTarget, "DDL", ddl, "connString", connString)
 
 	conn, err := pgx.Connect(ctx, connString)
 	if err != nil {
@@ -279,12 +289,15 @@ func mustInsertDistrictToMobilitydb(ctx context.Context, conn *pgx.Conn, distric
 func insertWorker(ctx context.Context, id int, tripEvents <-chan *TripEvent, wg *sync.WaitGroup, connString string, dbTarget DBTarget) {
 	defer wg.Done()
 
+	logger.Info("Worker started", "id", id)
+
 	conn, err := pgx.Connect(ctx, connString)
 	if err != nil {
 		logger.Error("Unable to connect to database", "error", err)
 		os.Exit(1)
 	}
 	defer conn.Close(ctx)
+	logger.Info("Worker conntected to db", "id", id)
 
 	getInsertTripEventSql := getInsertTripEventCratedbSql
 	switch dbTarget {
@@ -305,6 +318,8 @@ func insertWorker(ctx context.Context, id int, tripEvents <-chan *TripEvent, wg 
 				logger.Info("Worker finished", "id", id)
 				return
 			}
+
+			logger.Debug("Worker: tripEvent received, inserting into db...", "id", id, "eventId", tEvent.EventID)
 
 			waitedForJobTime := time.Since(lastJobFinishTime)
 
@@ -328,6 +343,8 @@ func insertWorker(ctx context.Context, id int, tripEvents <-chan *TripEvent, wg 
 				"queryErr", err,
 			)
 			lastJobFinishTime = time.Now()
+
+			logger.Debug("Worker: tripEvent inserted into db", "id", id, "eventId", tEvent.EventID)
 		}
 	}
 }
@@ -445,6 +462,7 @@ func mustLoadDistricts(path string) []District {
 // --- Benchmark modes/strategies ---
 
 func benchmarkInserts(ctx context.Context, connString string, numWorkers int, dbTarget DBTarget, tripsFilename string) {
+	logger.Info("Starting Insert Benchmark", "dbConnString", connString, "numWorkers", numWorkers, "dbTarget", dbTarget, "tripsFilename", tripsFilename)
 	// create specified number of workers
 	var wg sync.WaitGroup
 	jobs := make(chan *TripEvent, runtime.NumCPU()*4) // larger buffer to combat workers waiting for main thread to read the csv file
@@ -454,6 +472,7 @@ func benchmarkInserts(ctx context.Context, connString string, numWorkers int, db
 			insertWorker(ctx, id, jobs, &wg, connString, dbTarget)
 		}(i)
 	}
+	logger.Info("Started worker threads", "numWorkers", numWorkers)
 
 	// open the csv file
 	f, err := os.Open(tripsFilename)

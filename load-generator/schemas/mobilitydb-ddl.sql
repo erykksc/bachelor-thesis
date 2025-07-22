@@ -1,10 +1,15 @@
+-- Enable MobilityDB extension
+CREATE EXTENSION IF NOT EXISTS mobilitydb CASCADE;
+
+-- Create table for escooter events using temporal geometry points
 CREATE TABLE escooter_events (
     event_id UUID PRIMARY KEY,
     trip_id UUID,
     timestamp TIMESTAMP,
-    geom geometry(Point, 4326)
+    location tgeompoint
 );
 
+-- Create table for points of interest
 CREATE TABLE pois (
     poi_id UUID PRIMARY KEY,
     name TEXT,
@@ -12,6 +17,7 @@ CREATE TABLE pois (
     geom geometry(Point, 4326)
 );
 
+-- Create table for districts
 CREATE TABLE districts (
     district_id UUID PRIMARY KEY,
     name TEXT,

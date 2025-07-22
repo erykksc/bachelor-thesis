@@ -1,0 +1,73 @@
+{{define "MostFrequentPOIToPOITrips"}}
+SELECT start.poi_id AS start_poi, end.poi_id AS end_poi, COUNT(*) AS trip_count
+FROM (
+  SELECT trip_id,
+         MIN(timestamp) AS start_time,
+         MAX(timestamp) AS end_time
+  FROM escooter_events
+  GROUP BY trip_id
+) t
+JOIN escooter_events e_start ON e_start.trip_id = t.trip_id AND e_start.timestamp = t.start_time
+JOIN escooter_events e_end ON e_end.trip_id = t.trip_id AND e_end.timestamp = t.end_time
+JOIN pois start ON geo_distance(e_start.geo_point, start.geo_point) < {{.Radius}}
+JOIN pois end ON geo_distance(e_end.geo_point, end.geo_point) < {{.Radius}}
+GROUP BY start.poi_id, end.poi_id
+ORDER BY trip_count DESC
+LIMIT {{.Limit}};
+{{end}}
+
+{{define "EventDensityHeatmapPerDistrict"}}
+SELECT d.name AS district,
+       date_bin('1 hour', e.timestamp, '2025-01-01') AS hour,
+       COUNT(*) AS event_count
+FROM escooter_events e
+JOIN districts d ON geo_within(e.geo_point, d.geo_shape)
+WHERE e.timestamp BETWEEN '{{.StartTime}}' AND '{{.EndTime}}'
+GROUP BY d.name, hour
+ORDER BY d.name, hour;
+{{end}}
+
+{{define "TripDurationsPerDistrict"}}
+SELECT d.name AS district,
+       AVG(duration_secs) AS avg_duration_secs
+FROM (
+  SELECT trip_id,
+         EXTRACT(EPOCH FROM MAX(timestamp) - MIN(timestamp)) AS duration_secs
+  FROM escooter_events
+  GROUP BY trip_id
+) trip_durations
+JOIN escooter_events e ON e.trip_id = trip_durations.trip_id
+JOIN districts d ON geo_within(e.geo_point, d.geo_shape)
+GROUP BY d.name
+ORDER BY avg_duration_secs DESC;
+{{end}}
+
+{{define "MostVisitedPOIs"}}
+SELECT p.poi_id, p.name, COUNT(*) AS visits
+FROM escooter_events e
+JOIN pois p ON geo_distance(e.geo_point, p.geo_point) < {{.Radius}}
+WHERE e.timestamp BETWEEN '{{.StartTime}}' AND '{{.EndTime}}'
+GROUP BY p.poi_id, p.name
+ORDER BY visits DESC
+LIMIT {{.Limit}};
+{{end}}
+
+{{define "OriginDestinationMatrix"}}
+SELECT d_start.name AS origin,
+       d_end.name AS destination,
+       COUNT(*) AS trip_count
+FROM (
+  SELECT trip_id,
+         MIN(timestamp) AS start_time,
+         MAX(timestamp) AS end_time
+  FROM escooter_events
+  GROUP BY trip_id
+) trips
+JOIN escooter_events e_start ON e_start.trip_id = trips.trip_id AND e_start.timestamp = trips.start_time
+JOIN escooter_events e_end ON e_end.trip_id = trips.trip_id AND e_end.timestamp = trips.end_time
+JOIN districts d_start ON geo_within(e_start.geo_point, d_start.geo_shape)
+JOIN districts d_end ON geo_within(e_end.geo_point, d_end.geo_shape)
+GROUP BY d_start.name, d_end.name
+ORDER BY trip_count DESC
+LIMIT {{.Limit}};
+{{end}}

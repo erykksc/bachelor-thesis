@@ -1,0 +1,19 @@
+CREATE TABLE IF NOT EXISTS escooter_events (
+    event_id TEXT PRIMARY KEY,
+    trip_id TEXT,
+    timestamp TIMESTAMP,
+    geo_point GEO_POINT
+);
+
+CREATE TABLE IF NOT EXISTS pois (
+    poi_id TEXT PRIMARY KEY,
+    name TEXT,
+    category TEXT,
+    geo_point GEO_POINT
+);
+
+CREATE TABLE IF NOT EXISTS districts (
+    district_id TEXT PRIMARY KEY,
+    name TEXT,
+    geo_shape GEO_SHAPE
+);
