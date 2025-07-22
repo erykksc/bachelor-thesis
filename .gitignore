@@ -21,4 +21,4 @@ opentofu/.terraform/
 *.blg
 *.bcf
 *.synctex.gz
-
+thesis/thesis.pdf
