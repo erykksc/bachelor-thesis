@@ -18,7 +18,7 @@ Additionally, the vertical scalability of each system has not been determined an
 
 Furthermore, a more realistic workload could be benchmarked, such as a trace based one instead of micro-benchmark.
 
-The systems would also need to be evaluated when nodes of the DBMS would be running on bare metal servers, not on top of Kubernetes inside docker containers as containerization alongside the Kubernetes overhead could impact the results.
+The systems would also need to be evaluated when nodes of the DDBMS would be running on bare metal servers, not on top of Kubernetes inside docker containers as containerization alongside the Kubernetes overhead could impact the results.
 
 Consistency has not been evaluated, as \mobilitydbc supports ACID compliant transactions and CrateDB guarantees only eventual consistency.
 Future research could check how much time does CrateDB need to get into consistent state.
