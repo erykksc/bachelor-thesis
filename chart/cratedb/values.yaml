@@ -1,0 +1,130 @@
+# Default values for crateDB.
+
+# number of nodes in the crateDB cluster
+clusterSize: 3
+
+# crateDB cluster name
+clusterName: "cratedb-cluster"
+
+# namespace that you want to install crateDB
+# default installation is default namespace
+namespace: "default"
+
+# statefulset name
+cratadbStatefulsetName: crate-set
+
+# heap size ( default value set to 256 megabytes, half of requested memory)
+heapSize: 1G
+
+# crateDB internal service
+internalService:
+  type: ClusterIP
+  port: 4300
+  portName: crate-internal
+  name: crate-internal-service
+
+# crateDB external service ( for the Web User Interface )
+externalService:
+  enabled: true
+  type: LoadBalancer
+  name: crate-external-service
+  # web ui
+  webUiPort: 4200
+  webPortName: crate-web
+  #  PostgreSQL wire protocol port
+  pgsqlWirePort: 5432
+  pgsqlWirePortName: postgres
+
+# http Cross-origin resource sharing config
+http:
+  cors:
+    enabled: false
+    allowOrigin: "*"
+
+## The CouchDB image (This image uses the official crateDB image enterprise
+#  version that is free up to 3 nodes.)
+#  More information  https://crate.io/products/cratedb-editions/)
+image:
+  repository: crate
+  tag: 5.10.11
+  pullPolicy: IfNotPresent
+
+nameOverride: ""
+fullnameOverride: ""
+
+## The storage volume used by each Pod in the crateDB StatefulSet.
+persistentVolume:
+  enabled: false
+  accessModes:
+    - ReadWriteOnce
+  size: 10Gi
+#  storageClass: "-"
+
+## CrateDB configuration settings. These values passed as arguments of crateDB
+cratedbConfig:
+  dataPath: "/data"
+  volumeMountName: data
+  discovery:
+    recoverAfterNodes: 2
+    zen:
+      minimumMasterNodes: "cratedb-0,cratedb-1"
+      hostsProvider: srv
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+imagePullSecrets: []
+
+podAnnotations: {}
+
+podSecurityContext:
+  {}
+  # fsGroup: 2000
+
+securityContext:
+  {}
+  # capabilities:
+  #   drop:
+  #   - ALL
+  # readOnlyRootFilesystem: true
+  # runAsNonRoot: true
+  # runAsUser: 1000
+
+ingress:
+  enabled: false
+  annotations:
+    {}
+    # kubernetes.io/ingress.class: nginx
+    # kubernetes.io/tls-acme: "true"
+  hosts:
+    - host: chart-example.local
+      paths: []
+  tls: []
+  #  - secretName: chart-example-tls
+  #    hosts:
+  #      - chart-example.local
+
+resources:
+  {}
+  # We usually recommend not to specify default resources and to leave this as a conscious
+  # choice for the user. This also increases chances charts run on environments with little
+  # resources, such as Minikube. If you do want to specify resources, uncomment the following
+  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+  # limits:
+  #   cpu: 100m
+  #   memory: 128Mi
+  # requests:
+  #   cpu: 100m
+  #   memory: 128Mi
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
