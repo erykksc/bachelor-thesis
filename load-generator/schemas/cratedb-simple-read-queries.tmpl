@@ -1,5 +1,5 @@
 {{define "TripLength"}}
-SELECT SUM(geo_distance(e.geo_point, LEAD(e.geo_point) OVER (ORDER BY e.timestamp))) AS trip_length_m
+SELECT SUM(distance(e.geo_point, LEAD(e.geo_point) OVER (ORDER BY e.timestamp))) AS trip_length_m
 FROM escooter_events e
 WHERE e.trip_id = '{{.TripID}}';
 {{end}}
@@ -21,47 +21,47 @@ ORDER BY trip_id, timestamp DESC;
 SELECT e.*
 FROM escooter_events e
 JOIN districts d
-  ON geo_within(e.geo_point, d.geo_shape)
+  ON within(e.geo_point, d.geo_shape)
 WHERE d.name = '{{.DistrictName}}'
-  AND e.timestamp BETWEEN '{{.StartTime}}' AND '{{.EndTime}}';
+  AND e.timestamp BETWEEN {{.StartTime}} AND {{.EndTime}};
 {{end}}
 
 {{define "EscooterEventsNearPoiInTimeRange"}}
 SELECT e.*
 FROM escooter_events e
 JOIN pois p
-  ON geo_distance(e.geo_point, p.geo_point) < {{.Radius}}
+  ON distance(e.geo_point, p.geo_point) < {{.Radius}}
 WHERE p.poi_id = '{{.POIID}}'
-  AND e.timestamp BETWEEN '{{.StartTime}}' AND '{{.EndTime}}';
+  AND e.timestamp BETWEEN {{.StartTime}} AND {{.EndTime}};
 {{end}}
 
 {{define "EscootersAtTimeInDistrict"}}
 SELECT DISTINCT e.trip_id
 FROM escooter_events e
 JOIN districts d
-  ON geo_within(e.geo_point, d.geo_shape)
+  ON within(e.geo_point, d.geo_shape)
 WHERE d.name = '{{.DistrictName}}'
-  AND e.timestamp = '{{.Timestamp}}';
+  AND e.timestamp = {{.Timestamp}};
 {{end}}
 
 {{define "NearestEscooterToPOIAtTime"}}
 SELECT e.trip_id,
-       geo_distance(e.geo_point, p.geo_point) AS dist
+       distance(e.geo_point, p.geo_point) AS dist
 FROM escooter_events e
 JOIN pois p
   ON p.poi_id = '{{.POIID}}'
-WHERE e.timestamp = '{{.Timestamp}}'
+WHERE e.timestamp = {{.Timestamp}}
 ORDER BY dist
 LIMIT 1;
 {{end}}
 
 {{define "CountEventsInDistrictPerHour"}}
 SELECT
-    date_bin('1 hour', e.timestamp, '2025-01-01') AS hour,
+    DATE_BIN('1 hour', e.timestamp, '2025-01-01') AS hour,
     COUNT(*) AS event_count
 FROM escooter_events e
 JOIN districts d
-  ON geo_within(e.geo_point, d.geo_shape)
+  ON within(e.geo_point, d.geo_shape)
 WHERE d.name = '{{.DistrictName}}'
 GROUP BY hour
 ORDER BY hour;
@@ -71,7 +71,7 @@ ORDER BY hour;
 SELECT DISTINCT e.trip_id
 FROM escooter_events e
 JOIN pois p
-  ON geo_distance(e.geo_point, p.geo_point) < {{.Radius}}
+  ON distance(e.geo_point, p.geo_point) < {{.Radius}}
 WHERE p.poi_id = '{{.POIID}}';
 {{end}}
 
@@ -79,6 +79,5 @@ WHERE p.poi_id = '{{.POIID}}';
 SELECT e.*, p.*
 FROM escooter_events e
 JOIN pois p
-  ON geo_distance(e.geo_point, p.geo_point) < {{.Radius}};
+  ON distance(e.geo_point, p.geo_point) < {{.Radius}};
 {{end}}
-

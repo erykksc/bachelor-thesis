@@ -1,41 +1,26 @@
 package main
 
 import (
-	"database/sql"
+	"bytes"
+	"context"
+	"crypto/sha256"
+	"encoding/binary"
 	"encoding/csv"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
 	"log/slog"
+	"math/rand"
 	"os"
 	"os/signal"
 	"runtime"
-	"sync"
+	"strings"
 	"text/template"
 	"time"
-
-	"context"
-	"strings"
-
-	"github.com/jackc/pgx/v5"
-	"gopkg.in/yaml.v3"
 )
 
 var logger *slog.Logger
-
-type ReadQueryDef struct {
-	Name        string       `yaml:"name"`
-	Description string       `yaml:"description"`
-	Parameters  []QueryParam `yaml:"parameters"`
-	CrateSQL    string       `yaml:"cratedb_sql"`
-	MobSQL      string       `yaml:"mobilitydb_sql"`
-}
-
-type QueryParam struct {
-	Name string `yaml:"name"`
-	Type string `yaml:"type"`
-}
 
 type POI struct {
 	POIID     string //UUID
@@ -64,6 +49,129 @@ type TripEvent struct {
 	Longitude string
 }
 
+// QueryFieldGenerator generates random query parameters in a seeded, deterministic manner
+type QueryFieldGenerator struct {
+	baseSeed   int64
+	fieldRands map[string]*rand.Rand
+
+	// Real data pools from loaded files
+	districts []District
+	pois      []POI
+	tripIDs   []string
+
+	// Time bounds for realistic queries
+	minTime time.Time
+	maxTime time.Time
+}
+
+// QueryFields contains all possible template parameters
+type QueryFields struct {
+	DistrictName string
+	EndTime      time.Time
+	Limit        int
+	POIID        string
+	Radius       float64
+	StartTime    time.Time
+	Timestamp    time.Time
+	TripID       string
+}
+
+// ValidateTemplateFields checks if a template contains any undefined field references
+func (qf QueryFields) ValidateTemplateFields(templateName string, templateContent string) error {
+	// Create a test template with strict error checking
+	testTemplate, err := template.New("validation").Option("missingkey=error").Parse(templateContent)
+	if err != nil {
+		return fmt.Errorf("template parsing error: %w", err)
+	}
+
+	// Try to execute the template with our fields
+	var buf bytes.Buffer
+	if err := testTemplate.Execute(&buf, qf); err != nil {
+		return fmt.Errorf("template %s contains undefined fields: %w", templateName, err)
+	}
+
+	return nil
+}
+
+// NewQueryFieldGenerator creates a new seeded field generator
+func NewQueryFieldGenerator(seed int64, districts []District, pois []POI) *QueryFieldGenerator {
+	// Generate realistic trip IDs pool (you could also load these from actual data)
+	tripIDs := make([]string, 10000)
+	tripRand := rand.New(rand.NewSource(seed))
+	for i := range tripIDs {
+		tripIDs[i] = fmt.Sprintf("trip_%06d", tripRand.Intn(100000))
+	}
+
+	// Set realistic time bounds (adjust based on your dataset)
+	minTime := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
+	maxTime := time.Date(2025, 12, 31, 23, 59, 59, 0, time.UTC)
+
+	generator := &QueryFieldGenerator{
+		baseSeed:   seed,
+		fieldRands: make(map[string]*rand.Rand),
+		districts:  districts,
+		pois:       pois,
+		tripIDs:    tripIDs,
+		minTime:    minTime,
+		maxTime:    maxTime,
+	}
+
+	// Initialize per-field random generators
+	fieldNames := []string{"DistrictName", "EndTime", "Limit", "POIID", "Radius", "StartTime", "Timestamp", "TripID"}
+	for _, fieldName := range fieldNames {
+		fieldSeed := generator.deriveFieldSeed(fieldName, 0)
+		generator.fieldRands[fieldName] = rand.New(rand.NewSource(fieldSeed))
+	}
+
+	return generator
+}
+
+// deriveFieldSeed creates a deterministic seed for a specific field and query index
+func (g *QueryFieldGenerator) deriveFieldSeed(fieldName string, queryIndex int64) int64 {
+	hash := sha256.New()
+	binary.Write(hash, binary.LittleEndian, g.baseSeed)
+	hash.Write([]byte(fieldName))
+	binary.Write(hash, binary.LittleEndian, queryIndex)
+
+	hashBytes := hash.Sum(nil)
+	return int64(binary.LittleEndian.Uint64(hashBytes[:8]))
+}
+
+// GenerateFields generates all query fields for a specific query index
+func (g *QueryFieldGenerator) GenerateFields(queryIndex int64) QueryFields {
+	// Update field generators with query-specific seeds
+	for fieldName, fieldRand := range g.fieldRands {
+		fieldSeed := g.deriveFieldSeed(fieldName, queryIndex)
+		fieldRand.Seed(fieldSeed)
+	}
+
+	// Generate start time first
+	timeRange := g.maxTime.Unix() - g.minTime.Unix()
+	startOffset := g.fieldRands["StartTime"].Int63n(timeRange - 3600) // Leave 1 hour for EndTime
+	startTime := time.Unix(g.minTime.Unix()+startOffset, 0)
+
+	// Generate end time after start time (1 minute to 1 hour later)
+	minDuration := int64(60)   // 1 minute
+	maxDuration := int64(3600) // 1 hour
+	duration := minDuration + g.fieldRands["EndTime"].Int63n(maxDuration-minDuration)
+	endTime := startTime.Add(time.Duration(duration) * time.Second)
+
+	// Generate single timestamp within reasonable bounds
+	timestampOffset := g.fieldRands["Timestamp"].Int63n(timeRange)
+	timestamp := time.Unix(g.minTime.Unix()+timestampOffset, 0)
+
+	return QueryFields{
+		DistrictName: g.districts[g.fieldRands["DistrictName"].Intn(len(g.districts))].Name,
+		EndTime:      endTime,
+		Limit:        1 + g.fieldRands["Limit"].Intn(100), // 1-100
+		POIID:        g.pois[g.fieldRands["POIID"].Intn(len(g.pois))].POIID,
+		Radius:       50.0 + g.fieldRands["Radius"].Float64()*1950.0, // 50-2000 meters
+		StartTime:    startTime,
+		Timestamp:    timestamp,
+		TripID:       g.tripIDs[g.fieldRands["TripID"].Intn(len(g.tripIDs))],
+	}
+}
+
 type DBTarget int
 
 const (
@@ -87,7 +195,7 @@ func main() {
 	// utilize all cores
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, os.Kill)
 	defer stop()
 	// CLI flags
 	var (
@@ -96,10 +204,13 @@ func main() {
 		poisPath           = flag.String("pois", "../dataset-generator/output/berlin-pois.csv", "Path to a file containing POIs")
 		tripsPath          = flag.String("trips", "../dataset-generator/output/escooter-trips-small.csv", "Path to a CSV file containing the escooter trip events")
 		ddlPath            = flag.String("ddl", "./schemas/cratedb-ddl.sql", "File containing the DDL for creating database tables")
-		mode               = flag.String("mode", "insert", "Mode: insert or query")
+		mode               = flag.String("mode", "insert", "Mode: insert, simple-query, or complex-query")
 		numWorkers         = flag.Int("nworkers", 100, "Number of simultanious workers for the benchmark to use")
 		skipInitialization = flag.Bool("skip-init", false, "Skip database initialization (creating tables, inserting POIs, and districts")
 		logDebug           = flag.Bool("log-debug", false, "Turn on the DEBUG level for logging")
+		queriesPerWorker   = flag.Int("queries-per-worker", 100, "Number of queries each worker should execute")
+		randomSeed         = flag.Int64("seed", 42, "Random seed for deterministic query generation")
+		templatesFilepath  = flag.String("qtemplates", "./schemas/cratedb-simple-read-queries.tmpl", "Path to a file containing query templates")
 	)
 	flag.Parse()
 
@@ -133,8 +244,8 @@ func main() {
 	pois := mustLoadPOIs(*poisPath)
 	logger.Info("Loaded and parsed pois", "count", len(pois))
 
-	// readQueries := mustLoadReadQueries(filepath.Join(*schemasPath, "read-queries.yaml"))
-	// logger.Info("Loaded read queries templates", "count", len(readQueries))
+	queryTemplates := mustLoadAndValidateTemplates(*templatesFilepath)
+	logger.Info("Loaded read queries templates", "count", len(queryTemplates.Templates()))
 
 	if *skipInitialization {
 		logger.Info("Skipping initialization because of the CLI flag")
@@ -152,247 +263,13 @@ func main() {
 	case "insert":
 		benchmarkInserts(ctx, connString, *numWorkers, dbTarget, *tripsPath)
 	case "simple-query":
-	// benchmarkSimpleQueries()
+		benchmarkQueries(ctx, connString, *numWorkers, dbTarget, districts, pois, queryTemplates, *queriesPerWorker, *randomSeed)
 	case "complex-query":
-	//benchmarkComplexQueries()
+		// benchmarkQueries(ctx, connString, *numWorkers, dbTarget, districts, pois, *schemasPath, *queriesPerWorker, *randomSeed, "complex")
 	default:
 		logger.Error("unknown mode", "mode", *mode)
 		os.Exit(1)
 	}
-}
-
-func mustInitializeDb(ctx context.Context, connString string, dbTarget DBTarget, pois []POI, districts []District, ddl string) {
-	logger.Info("Initializing Database", "databaseType", dbTarget, "connString", connString, "poiCount", len(pois), "districtCount", len(districts))
-	mustInsertPoiToDb := mustInsertPoiToCratedb
-	mustInsertDistrictToDb := mustInsertDistrictToCratedb
-
-	switch dbTarget {
-	case CrateDB:
-		logger.Info("Initializing CrateDB")
-		mustInsertPoiToDb = mustInsertPoiToCratedb
-		mustInsertDistrictToDb = mustInsertDistrictToCratedb
-
-	case MobilityDB:
-		logger.Info("Initializing MobilityDB")
-		mustInsertPoiToDb = mustInsertPoiToMobilitydb
-		mustInsertDistrictToDb = mustInsertDistrictToMobilitydb
-	}
-
-	conn, err := pgx.Connect(ctx, connString)
-	if err != nil {
-		logger.Error("Unable to connect to database", "error", err)
-		os.Exit(1)
-	}
-	defer conn.Close(ctx)
-
-	// Initialize tables
-	res, err := conn.Exec(ctx, ddl)
-	if err != nil {
-		logger.Error("Error while executing DDL", "database", dbTarget, "result", res, "error", err)
-		os.Exit(1)
-	}
-	logger.Info("Inserted Tables successfully", "res", res)
-
-	// Insert POIs
-	startTime := time.Now()
-	for _, poi := range pois {
-		mustInsertPoiToDb(ctx, conn, &poi)
-	}
-	logger.Info("Inserted all POIs into database", "dbTarget", dbTarget, "poiCount", len(pois), "timeElapsed", time.Since(startTime))
-
-	// Insert districts
-	startTime = time.Now()
-	for _, district := range districts {
-		mustInsertDistrictToDb(ctx, conn, &district)
-	}
-	logger.Info("Inserted all districts into database", "dbTarget", dbTarget, "districtCount", len(pois), "timeElapsed", time.Since(startTime))
-}
-
-func mustInsertPoiToCratedb(ctx context.Context, conn *pgx.Conn, poi *POI) {
-	// string interpolation is done instead of passing arguments to conn.Exec
-	// as I want to avoid istalling additional library to support GEO_POINT types
-	query := fmt.Sprintf(`INSERT INTO pois(
-				poi_id,
-				name,
-				category,
-				geo_point
-			) VALUES (
-				'%s', '%s', '%s', [%s, %s]
-			);`, poi.POIID, poi.Name, poi.Category, poi.Latitude, poi.Longitude)
-	cmdTag, err := conn.Exec(ctx, query)
-	if err != nil {
-		logger.Error("Error executing poi insert query", "error", err, "commandTag", cmdTag.String(), "poiData", poi)
-		os.Exit(1)
-	}
-	logger.Debug("Inserted POI", "poi", poi)
-}
-
-func mustInsertPoiToMobilitydb(ctx context.Context, conn *pgx.Conn, poi *POI) {
-	query := fmt.Sprintf(`INSERT INTO pois (
-		poi_id,
-		name,
-		category,
-		geom
-	)
-	VALUES (
-		%s,
-		'%s',
-		'%s',
-		ST_SetSRID(ST_MakePoint(%s, %s), 4326)
-	);`, poi.POIID, poi.Name, poi.Category, poi.Longitude, poi.Latitude)
-	cmdTag, err := conn.Exec(ctx, query)
-	if err != nil {
-		logger.Error("Error executing poi insert query", "error", err, "commandTag", cmdTag.String(), "poiData", poi)
-		os.Exit(1)
-	}
-	logger.Debug("Inserted POI", "poi", poi)
-}
-
-func mustInsertDistrictToCratedb(ctx context.Context, conn *pgx.Conn, district *District) {
-	query := `INSERT INTO districts( district_id, name, geo_shape)
-				VALUES ( $1, $2, $3);`
-
-	cmdTag, err := conn.Exec(ctx, query, district.DistrictID, district.Name, district.Geometry)
-	if err != nil {
-		logger.Error("Error executing district insert query", "error", err, "commandTag", cmdTag.String(), "districtData", district)
-		os.Exit(1)
-	}
-	logger.Debug("Inserted District", "district", district)
-}
-
-func mustInsertDistrictToMobilitydb(ctx context.Context, conn *pgx.Conn, district *District) {
-	query := `
-		INSERT INTO districts (
-			district_id,
-			name,
-			geom
-		)
-		VALUES (
-			$1,
-			$2,
-			ST_GeomFromGeoJSON($3)
-		);`
-
-	cmdTag, err := conn.Exec(ctx, query, district.DistrictID, district.Name, district.Geometry)
-	if err != nil {
-		logger.Error("Error executing district insert query", "error", err, "commandTag", cmdTag.String(), "districtData", district)
-		os.Exit(1)
-	}
-	logger.Debug("Inserted District", "district", district)
-}
-
-// each worker should measure and log all available metrics
-//   - whether the insert was sucessful
-//   - the time it took to insert (if provided in the response)
-//   - the latency of getting a response
-//   - time spend waiting for receiving the next job through channel
-func insertWorker(ctx context.Context, id int, tripEvents <-chan *TripEvent, wg *sync.WaitGroup, connString string, dbTarget DBTarget) {
-	defer wg.Done()
-
-	logger.Info("Worker started", "id", id)
-
-	conn, err := pgx.Connect(ctx, connString)
-	if err != nil {
-		logger.Error("Unable to connect to database", "error", err)
-		os.Exit(1)
-	}
-	defer conn.Close(ctx)
-	logger.Info("Worker conntected to db", "id", id)
-
-	getInsertTripEventSql := getInsertTripEventCratedbSql
-	switch dbTarget {
-	case CrateDB:
-		getInsertTripEventSql = getInsertTripEventCratedbSql
-	case MobilityDB:
-		getInsertTripEventSql = getInsertTripEventMobilitydbSql
-	}
-
-	lastJobFinishTime := time.Now()
-	for {
-		select {
-		case <-ctx.Done():
-			logger.Info("Worker finished because the passed context is marked as done", "id", id)
-			return
-		case tEvent, ok := <-tripEvents:
-			if !ok {
-				logger.Info("Worker finished", "id", id)
-				return
-			}
-
-			logger.Debug("Worker: tripEvent received, inserting into db...", "id", id, "eventId", tEvent.EventID)
-
-			waitedForJobTime := time.Since(lastJobFinishTime)
-
-			query := getInsertTripEventSql(tEvent)
-
-			querySuccessful := true
-			startTime := time.Now()
-			cmdTag, err := conn.Exec(ctx, query)
-			if err != nil {
-				querySuccessful = false
-			}
-
-			endTime := time.Now()
-			logger.Info("Worker finished insert",
-				"workerId", id,
-				"jobType", "insert",
-				"insertTime", endTime.Sub(startTime),
-				"waitedForJobTime", waitedForJobTime,
-				"successful", querySuccessful,
-				"cmdTag", cmdTag,
-				"queryErr", err,
-			)
-			lastJobFinishTime = time.Now()
-
-			logger.Debug("Worker: tripEvent inserted into db", "id", id, "eventId", tEvent.EventID)
-		}
-	}
-}
-
-func getInsertTripEventCratedbSql(tEvent *TripEvent) string {
-	return fmt.Sprintf(`
-	INSERT INTO escooter_events (
-		event_id,
-		trip_id,
-		timestamp,
-		geo_point
-	)
-	VALUES (
-		'%s', '%s', '%s', [%s, %s]
-	);`, tEvent.EventID, tEvent.TripID, tEvent.Timestamp, tEvent.Latitude, tEvent.Longitude)
-}
-
-func getInsertTripEventMobilitydbSql(tEvent *TripEvent) string {
-	return fmt.Sprintf(`
-	INSERT INTO escooter_events (
-		event_id,
-		trip_id,
-		timestamp,
-		location
-	)
-	VALUES (
-		%s, 
-		%s,
-		%s,
-		tgeompoint 'Point(%s %s)@%s'
-	);`, tEvent.EventID, tEvent.TripID, tEvent.Timestamp, tEvent.Longitude, tEvent.Latitude, tEvent.Timestamp)
-}
-
-// --- Loading functions ---
-
-func mustLoadReadQueries(queriesPath string) []ReadQueryDef {
-	var queries []ReadQueryDef
-	// Load queries
-	dataQ, err := os.ReadFile(queriesPath)
-	if err != nil {
-		logger.Error("Error during os.ReadFile", "file", queriesPath, "error", err)
-		os.Exit(1)
-	}
-	if err := yaml.Unmarshal(dataQ, &struct{ Queries *[]ReadQueryDef }{&queries}); err != nil {
-		logger.Error("Error during yaml.Unmarshal", "dataFromFile", queriesPath, "error", err)
-		os.Exit(1)
-	}
-	return queries
 }
 
 func mustLoadPOIs(path string) []POI {
@@ -459,101 +336,32 @@ func mustLoadDistricts(path string) []District {
 	return districts
 }
 
-// --- Benchmark modes/strategies ---
+func mustLoadAndValidateTemplates(templatesFilepath string) *template.Template {
+	templates := template.Must(template.New("").ParseFiles(templatesFilepath))
+	templates = templates.Option("missingkey=error")
 
-func benchmarkInserts(ctx context.Context, connString string, numWorkers int, dbTarget DBTarget, tripsFilename string) {
-	logger.Info("Starting Insert Benchmark", "dbConnString", connString, "numWorkers", numWorkers, "dbTarget", dbTarget, "tripsFilename", tripsFilename)
-	// create specified number of workers
-	var wg sync.WaitGroup
-	jobs := make(chan *TripEvent, runtime.NumCPU()*4) // larger buffer to combat workers waiting for main thread to read the csv file
-	for i := 1; i <= numWorkers; i++ {
-		wg.Add(1)
-		go func(id int) {
-			insertWorker(ctx, id, jobs, &wg, connString, dbTarget)
-		}(i)
-	}
-	logger.Info("Started worker threads", "numWorkers", numWorkers)
-
-	// open the csv file
-	f, err := os.Open(tripsFilename)
-	if err != nil {
-		logger.Error("Error opening file", "error", err, "filename", tripsFilename)
-		os.Exit(1)
-	}
-	defer f.Close()
-	r := csv.NewReader(f)
-
-	// read header of csv
-	if _, err := r.Read(); err != nil {
-		logger.Error("Error in read pois header", "error", err)
-		os.Exit(1)
+	// Validate that all templates work with our QueryFields structure
+	testFields := QueryFields{
+		DistrictName: "TestDistrict",
+		EndTime:      time.Now().Add(time.Hour),
+		Limit:        10,
+		POIID:        "test-poi-id",
+		Radius:       100.0,
+		StartTime:    time.Now(),
+		Timestamp:    time.Now(),
+		TripID:       "test-trip-id",
 	}
 
-	// read the trips csv and send the jobs to workers
-	startTime := time.Now()
-	tripEventsCount := 0
-csvScanLoop:
-	for {
-		rec, err := r.Read()
-		if err == io.EOF {
-			break
-		} else if err != nil {
-			logger.Error("Error in read of trips csv", "error", err)
+	for _, tmpl := range templates.Templates() {
+		var buf bytes.Buffer
+		if err := tmpl.Execute(&buf, testFields); err != nil {
+			logger.Error("Template validation failed - contains undefined fields",
+				"template", tmpl.Name(),
+				"error", err,
+			)
 			os.Exit(1)
 		}
-
-		tripEvent := &TripEvent{
-			EventID:   rec[0],
-			TripID:    rec[1],
-			Timestamp: rec[2],
-			Latitude:  rec[3],
-			Longitude: rec[4],
-		}
-
-		select {
-		case <-ctx.Done():
-			break csvScanLoop
-		case jobs <- tripEvent:
-		}
-		tripEventsCount++
+		logger.Debug("Template validation passed", "template", tmpl.Name())
 	}
-
-	close(jobs)
-	wg.Wait()
-	if ctx.Err() == nil {
-		logger.Info("All escooter trip events added", "count", tripEventsCount, "timeElapsed", time.Since(startTime))
-	}
-
-}
-
-func benchmarkSimpleQueries(db *sql.DB, target string, queries []ReadQueryDef, districts []District, pois []POI) {
-	// prepare templates
-	tmpls := make(map[string]*template.Template)
-	for _, def := range queries {
-		var sqlT string
-		if target == "cratedb" {
-			sqlT = def.CrateSQL
-		} else {
-			sqlT = def.MobSQL
-		}
-		tmpls[def.Name] = template.Must(template.New(def.Name).Parse(sqlT))
-	}
-	// example: pick a random query, fill params from districts/pois, execute...
-	// TODO: implement random selection, param generation, timing, and db.Query(...)
-}
-
-func benchmarkComplexQueries(db *sql.DB, target string, queries []ReadQueryDef, districts []District, pois []POI) {
-	// prepare templates
-	tmpls := make(map[string]*template.Template)
-	for _, def := range queries {
-		var sqlT string
-		if target == "cratedb" {
-			sqlT = def.CrateSQL
-		} else {
-			sqlT = def.MobSQL
-		}
-		tmpls[def.Name] = template.Must(template.New(def.Name).Parse(sqlT))
-	}
-	// example: pick a random query, fill params from districts/pois, execute...
-	// TODO: implement random selection, param generation, timing, and db.Query(...)
+	return templates
 }
