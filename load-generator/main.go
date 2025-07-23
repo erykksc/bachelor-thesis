@@ -133,7 +133,6 @@ func main() {
 
 	case "query":
 		queryTemplates := template.Must(template.New("").ParseFiles(*templatesFilepath))
-		queryTemplates = queryTemplates.Option("missingkey=error")
 		logger.Info("Loaded read queries templates", "count", len(queryTemplates.Templates()))
 		benchmarkQueries(ctx, connString, *numWorkers, dbTarget, districts, pois, queryTemplates, *queriesPerWorker, *randomSeed)
 

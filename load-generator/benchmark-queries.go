@@ -25,6 +25,8 @@ func benchmarkQueries(ctx context.Context, connString string, numWorkers int, db
 		"seed", seed,
 	)
 
+	queryTemplates = queryTemplates.Option("missingkey=error")
+
 	// Validate that all templates work with our QueryFields structure
 	testFields := QueryFields{
 		DistrictName: "TestDistrict",
@@ -79,14 +81,14 @@ func benchmarkQueries(ctx context.Context, connString string, numWorkers int, db
 }
 
 // queryWorker executes random queries using the field generator and templates
-func queryWorker(ctx context.Context, id int, generator *QueryFieldGenerator, templates *template.Template, wg *sync.WaitGroup, connString string, maxQueries int) {
+func queryWorker(ctx context.Context, id int, generator *QueryFieldGenerator, templates *template.Template, wg *sync.WaitGroup, connString string, queries2execute int) {
 	defer wg.Done()
 
 	logger.Info("Query worker started", "id", id)
 
 	conn, err := pgx.Connect(ctx, connString)
 	if err != nil {
-		logger.Error("Query worker unable to connect to database", "id", id, "error", err)
+		logger.Error("Query worker was unable to connect to database, worker stopping", "id", id, "error", err)
 		return
 	}
 	defer conn.Close(ctx)
@@ -101,7 +103,7 @@ func queryWorker(ctx context.Context, id int, generator *QueryFieldGenerator, te
 		templateNames[i] = tmpl.Name()
 	}
 
-	for executedQueries < maxQueries {
+	for executedQueries < queries2execute {
 		select {
 		case <-ctx.Done():
 			logger.Info("Query worker finished because context is done", "id", id, "executedQueries", executedQueries)
@@ -109,44 +111,45 @@ func queryWorker(ctx context.Context, id int, generator *QueryFieldGenerator, te
 		default:
 			// Generate fields for this query
 			fields := generator.GenerateFields(queryIndex)
+			queryIndex++
 
 			// Pick random template
 			templateName := templateNames[int(queryIndex)%len(templateNames)]
 
 			// Execute template with generated fields
-			var buf bytes.Buffer
-			if err := templates.ExecuteTemplate(&buf, templateName, fields); err != nil {
+			var query strings.Builder
+			if err := templates.ExecuteTemplate(&query, templateName, fields); err != nil {
 				logger.Error("Query worker failed to execute template", "id", id, "template", templateName, "error", err, "fields", fields)
-				queryIndex++
 				continue
 			}
-
-			// Check if template execution resulted in missing field errors
-			queryStr := buf.String()
-			if strings.Contains(queryStr, "<no value>") {
-				logger.Error("Query worker template contains missing fields",
-					"id", id,
-					"template", templateName,
-					"query", queryStr,
-					"fields", fields)
-				queryIndex++
-				continue
-			}
-
-			query := queryStr
 
 			waitedTime := time.Since(lastJobFinishTime)
 			querySuccessful := true
+			resultingRowsCount := 0
 			startTime := time.Now()
 
-			rows, err := conn.Query(ctx, query)
+			rows, err := conn.Query(ctx, query.String())
 			if err != nil {
 				querySuccessful = false
 				logger.Debug("Query worker query failed", "id", id, "error", err)
 			} else {
-				// Consume all rows to complete the query
+				// consume the resulting rows
+				rowNum := -1
 				for rows.Next() {
-					// Just iterate through results without processing
+					rowNum++
+					rowVals, err := rows.Values()
+					if err != nil {
+						// This shouldn't happen as we first check with rows.Next if a value exist
+						querySuccessful = false
+						logger.Debug("Query worker query failed when reading values of a resulting rows", "id", id, "rowNum", rowNum, "error", err)
+					}
+
+					logger.Debug("Query worker query resulted in row", "id", id, "rowNum", rowNum, "error", err, "values", rowVals)
+					resultingRowsCount++
+				}
+				if err = rows.Err(); err != nil {
+					querySuccessful = false
+					logger.Debug("Query worker query failed when reading resulting rows", "id", id, "error", err)
 				}
 				rows.Close()
 			}
