@@ -1,7 +1,7 @@
 # Default values for crateDB.
 
 # number of nodes in the crateDB cluster
-clusterSize: 2
+replicas: 2
 
 # crateDB cluster name
 clusterName: "cratedb-cluster"
@@ -65,9 +65,7 @@ cratedbConfig:
   dataPath: "/data"
   volumeMountName: data
   discovery:
-    recoverAfterDataNodes: -1 # -1 means it will wait for all the nodes to join
     zen:
-      minimumMasterNodes: "cratedb-0"
       hostsProvider: srv
 
 serviceAccount:

@@ -1,31 +1,17 @@
 # number of nodes in the crateDB cluster
-clusterSize: 3
+replicas: 3
 
 # heap size ( default value set to 256 megabytes, half of requested memory)
 heapSize: 1G
 
-## The CouchDB image (This image uses the official crateDB image enterprise
-#  version that is free up to 3 nodes.)
-#  More information  https://crate.io/products/cratedb-editions/)
-image:
-  repository: crate
-  tag: 5.10.11
-  pullPolicy: IfNotPresent
-
 ## The storage volume used by each Pod in the crateDB StatefulSet.
 persistentVolume:
   enabled: false
-  accessModes:
-    - ReadWriteOnce
-  size: 10Gi
-#  storageClass: "-"
 
 ## CrateDB configuration settings. These values passed as arguments of crateDB
 cratedbConfig:
   dataPath: "/data"
   volumeMountName: data
   discovery:
-    recoverAfterNodes: 2
     zen:
-      minimumMasterNodes: "cratedb-0,cratedb-1"
       hostsProvider: srv

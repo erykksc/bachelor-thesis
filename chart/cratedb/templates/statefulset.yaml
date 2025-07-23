@@ -8,7 +8,7 @@ metadata:
   {{- include "cratedb.labels" . | nindent 4 }}
 spec:
   serviceName: {{ .Values.cratadbStatefulsetName }}
-  replicas: {{ .Values.clusterSize }}
+  replicas: {{ .Values.replicas }}
   selector:
     matchLabels:
   {{- include "cratedb.selectorLabels" . | nindent 6 }}
@@ -57,10 +57,15 @@ spec:
             - /docker-entrypoint.sh
             - -Cnode.name=${POD_NAME}
             - -Ccluster.name=${CLUSTER_NAME}
-            - -Ccluster.initial_master_nodes={{ .Values.cratedbConfig.discovery.zen.minimumMasterNodes }}
+            {{- $n := .Values.replicas | int -}}
+            {{- $list := list -}}
+            {{- range $i := until $n }}
+              {{- $list = append $list (printf "cratedb-%d" $i) -}}
+            {{- end }}
+            - -Ccluster.initial_master_nodes="{{ join "," $list }}"
             - -Cdiscovery.seed_providers={{ .Values.cratedbConfig.discovery.zen.hostsProvider }}
             - -Cdiscovery.srv.query=_crate-internal._tcp.{{ .Values.internalService.name }}.${NAMESPACE}.svc.cluster.local
-            - -Cgateway.recover_after_data_nodes={{ .Values.cratedbConfig.discovery.recoverAfterDataNodes }}
+            - -Cgateway.recover_after_data_nodes=${EXPECTED_DATA_NODES}
             - -Cgateway.expected_data_nodes=${EXPECTED_DATA_NODES}
             - -Chttp.cors.allow-origin={{ .Values.http.cors.allowOrigin }}
             - -Chttp.cors.enabled={{ .Values.http.cors.enabled }}
@@ -87,7 +92,7 @@ spec:
             - name: CRATE_HEAP_SIZE
               value: "{{ .Values.heapSize }}"
             - name: EXPECTED_DATA_NODES
-              value: "{{ .Values.clusterSize }}"
+              value: "{{ .Values.replicas }}"
             - name: CLUSTER_NAME
               value: {{ .Values.clusterName }}
             - name: NAMESPACE

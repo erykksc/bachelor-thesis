@@ -104,7 +104,7 @@ The following table lists main configurable most common parameters of the CrateD
 
 | Parameter                       | Description                                                                          | Default         |
 | ------------------------------- | ------------------------------------------------------------------------------------ | --------------- |
-| `clusterSize`                   | The initial number of nodes in the CrateDB cluster                                   | 3               |
+| `replicas`                      | The initial number of nodes in the CrateDB cluster                                   | 3               |
 | `clusterName`                   | name given for the new CrateDB cluster                                               | cratedb-cluster |
 | `namespace`                     | namespace that you want to install crateDB                                           | default         |
 | `cratadbStatefulsetName`        | Name for the CrateDB statefulset                                                     | crate-set       |
