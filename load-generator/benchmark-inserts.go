@@ -21,7 +21,8 @@ func benchmarkInserts(ctx context.Context, connString string, numWorkers int, db
 	for i := 1; i <= numWorkers; i++ {
 		wg.Add(1)
 		go func(id int) {
-			insertWorker(ctx, id, jobs, &wg, connString, dbTarget)
+			insertWorker(ctx, id, jobs, connString, dbTarget)
+			wg.Done()
 		}(i)
 	}
 	logger.Info("Started worker threads", "numWorkers", numWorkers)
@@ -73,7 +74,7 @@ csvScanLoop:
 	close(jobs)
 	wg.Wait()
 	if ctx.Err() == nil {
-		logger.Info("All escooter trip events added", "count", tripEventsCount, "timeElapsed", time.Since(startTime))
+		logger.Info("All escooter trip events added", "count", tripEventsCount, "timeElapsedInSec", time.Since(startTime).Seconds())
 	}
 
 }
@@ -83,9 +84,7 @@ csvScanLoop:
 //   - the time it took to insert (if provided in the response)
 //   - the latency of getting a response
 //   - time spend waiting for receiving the next job through channel
-func insertWorker(ctx context.Context, id int, tripEvents <-chan *TripEvent, wg *sync.WaitGroup, connString string, dbTarget DBTarget) {
-	defer wg.Done()
-
+func insertWorker(ctx context.Context, id int, tripEvents <-chan *TripEvent, connString string, dbTarget DBTarget) {
 	logger.Info("Worker started", "id", id)
 
 	conn, err := pgx.Connect(ctx, connString)
@@ -103,6 +102,21 @@ func insertWorker(ctx context.Context, id int, tripEvents <-chan *TripEvent, wg 
 	case MobilityDB:
 		getInsertTripEventSql = getInsertTripEventMobilitydbSql
 	}
+
+	insertsAttempted := 0
+	insertedEvents := 0
+	failedInserts := 0
+
+	defer func() {
+		logger.Info(
+			"Insert worker finished",
+			"id", id,
+			"insertsAttempted", insertsAttempted,
+			"insertedEvents", insertedEvents,
+			"failedInserts", failedInserts,
+			"ctxErr", ctx.Err(),
+		)
+	}()
 
 	lastJobFinishTime := time.Now()
 	for {
@@ -122,19 +136,25 @@ func insertWorker(ctx context.Context, id int, tripEvents <-chan *TripEvent, wg 
 
 			query := getInsertTripEventSql(tEvent)
 
+			insertsAttempted++
 			querySuccessful := true
 			startTime := time.Now()
 			cmdTag, err := conn.Exec(ctx, query)
 			if err != nil {
 				querySuccessful = false
+				insertedEvents++
+			} else {
+				failedInserts++
 			}
 
 			endTime := time.Now()
 			logger.Info("Worker finished insert",
 				"workerId", id,
 				"jobType", "insert",
-				"insertTime", endTime.Sub(startTime),
-				"waitedForJobTime", waitedForJobTime,
+				"startTime", startTime,
+				"endTime", endTime,
+				"insertTime", endTime.Sub(startTime).Milliseconds(),
+				"waitedForJobTime", waitedForJobTime.Milliseconds(),
 				"successful", querySuccessful,
 				"cmdTag", cmdTag,
 				"queryErr", err,

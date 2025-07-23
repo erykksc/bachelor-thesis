@@ -1,13 +1,14 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/binary"
-	"fmt"
+	"encoding/csv"
+	"io"
 	"math/rand"
 	"os"
+	"runtime"
 	"strings"
 	"sync"
 	"text/template"
@@ -16,74 +17,153 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-func benchmarkQueries(ctx context.Context, connString string, numWorkers int, dbTarget DBTarget, districts []District, pois []POI, queryTemplates *template.Template, queriesPerWorker int, seed int64) {
+func benchmarkQueries(ctx context.Context, connString string, numWorkers int, dbTarget DBTarget, tripEventsCSV string, districts []District, pois []POI, queryTemplates *template.Template, numQueries int, seed int64) {
 	logger.Info("Starting Query Benchmark",
 		"dbConnString", connString,
 		"numWorkers", numWorkers,
 		"dbTarget", dbTarget,
-		"queriesPerWorker", queriesPerWorker,
+		"queriesNum", numQueries,
 		"seed", seed,
 	)
 
-	queryTemplates = queryTemplates.Option("missingkey=error")
-
-	// Validate that all templates work with our QueryFields structure
-	testFields := QueryFields{
-		DistrictName: "TestDistrict",
-		EndTime:      time.Now().Add(time.Hour),
-		Limit:        10,
-		POIID:        "test-poi-id",
-		Radius:       100.0,
-		StartTime:    time.Now(),
-		Timestamp:    time.Now(),
-		TripID:       "test-trip-id",
-	}
-
-	for _, tmpl := range queryTemplates.Templates() {
-		var buf bytes.Buffer
-		if err := tmpl.Execute(&buf, testFields); err != nil {
-			logger.Error("Template validation failed - contains undefined fields",
-				"template", tmpl.Name(),
-				"error", err,
-			)
-			os.Exit(1)
-		}
-		logger.Debug("Template validation passed", "template", tmpl.Name())
-	}
-
-	logger.Info("Using query templates", "count", len(queryTemplates.Templates()))
+	tripIds := ReadTripIds(ctx, tripEventsCSV)
 
 	// Create field generator
-	generator := NewQueryFieldGenerator(seed, districts, pois)
+	generator := NewQueryFieldGenerator(seed, districts, pois, tripIds)
+
+	queryTemplates = queryTemplates.Option("missingkey=error")
+	err := ValidateTempaltes(ctx, queryTemplates, connString, generator)
+	if err != nil {
+		logger.Error("Not all templates passed the validation, stopping benchmark", "error", err)
+		return
+	}
+	logger.Info("Using query templates", "count", len(queryTemplates.Templates()))
 
 	// Start workers
+	jobs := make(chan QueryJob, runtime.NumCPU()*4) // larger buffer to combat workers waiting for main thread to read the csv file
 	var wg sync.WaitGroup
 	for i := 1; i <= numWorkers; i++ {
 		wg.Add(1)
 		go func(id int) {
-			queryWorker(ctx, id, generator, queryTemplates, &wg, connString, queriesPerWorker)
+			queryWorker(ctx, id, connString, queryTemplates, jobs)
+			wg.Done()
 		}(i)
 	}
-
 	logger.Info("Started query worker threads", "numWorkers", numWorkers)
+
+	templateNames := make([]string, len(queryTemplates.Templates()))
+	for i, tmpl := range queryTemplates.Templates() {
+		templateNames[i] = tmpl.Name()
+	}
 
 	// Wait for all workers to complete
 	startTime := time.Now()
+	for i := range numQueries {
+		fields := generator.GenerateFields(i)
+		randTmplName := templateNames[i%len(templateNames)]
+		jobs <- QueryJob{
+			Fields:       fields,
+			TemplateName: randTmplName,
+		}
+	}
+	close(jobs)
 	wg.Wait()
 
 	if ctx.Err() == nil {
-		totalQueries := numWorkers * queriesPerWorker
-		logger.Info("All query workers completed",
-			"totalQueries", totalQueries,
-			"timeElapsed", time.Since(startTime),
+		logger.Info("All query workers finished",
+			"totalQueries", numQueries,
+			"timeElapsedInSec", time.Since(startTime).Seconds(),
 		)
 	}
 }
 
-// queryWorker executes random queries using the field generator and templates
-func queryWorker(ctx context.Context, id int, generator *QueryFieldGenerator, templates *template.Template, wg *sync.WaitGroup, connString string, queries2execute int) {
-	defer wg.Done()
+func ValidateTempaltes(ctx context.Context, templates *template.Template, connString string, generator *QueryFieldGenerator) error {
+	templates = templates.Option("missingkey=error")
 
+	conn, err := pgx.Connect(ctx, connString)
+	if err != nil {
+		return err
+	}
+	defer conn.Close(ctx)
+
+	templateNames := make([]string, len(templates.Templates()))
+	for i, tmpl := range templates.Templates() {
+		templateNames[i] = tmpl.Name()
+	}
+
+	logger.Info("Validating the templates by running all the query types on database", "templateNames", templateNames)
+
+	fields := generator.GenerateFields(0)
+
+	for _, tmpl := range templates.Templates() {
+		// Execute template with generated fields
+		var query strings.Builder
+		if err := templates.ExecuteTemplate(&query, tmpl.Name(), fields); err != nil {
+			logger.Error("Template validation failed on template execution - contains undefined fields", "template", tmpl.Name(), "error", err, "fields", fields)
+			return err
+		}
+
+		rows, err := conn.Query(ctx, query.String())
+		defer rows.Close()
+		if err != nil {
+			logger.Error("Template validation failed on querying the database", "template", tmpl.Name(), "error", err, "query", query.String())
+			return err
+		}
+		rows.Close()
+
+		logger.Debug("Template validation passed", "template", tmpl.Name())
+	}
+	return nil
+}
+
+func ReadTripIds(ctx context.Context, tripEventsCSV string) []string {
+	// open the csv file
+	f, err := os.Open(tripEventsCSV)
+	if err != nil {
+		logger.Error("Error opening file", "error", err, "filename", tripEventsCSV)
+		os.Exit(1)
+	}
+	defer f.Close()
+	r := csv.NewReader(f)
+
+	// read header of csv
+	if _, err := r.Read(); err != nil {
+		logger.Error("Error in read pois header", "error", err)
+		os.Exit(1)
+	}
+
+	tripEventIds := make([]string, 0)
+	lastTripId := "" // used to pass only unique values
+	for {
+		if ctx.Err() != nil {
+			break
+		}
+
+		rec, err := r.Read()
+		if err == io.EOF {
+			break
+		} else if err != nil {
+			logger.Error("Error in read of trips csv", "error", err)
+			os.Exit(1)
+		}
+
+		tripId := rec[1]
+
+		if tripId != lastTripId {
+			tripEventIds = append(tripEventIds, rec[1])
+			lastTripId = tripId
+		}
+	}
+	return tripEventIds
+}
+
+type QueryJob struct {
+	TemplateName string
+	Fields       QueryFields
+}
+
+// queryWorker executes queries
+func queryWorker(ctx context.Context, id int, connString string, templates *template.Template, jobs <-chan QueryJob) {
 	logger.Info("Query worker started", "id", id)
 
 	conn, err := pgx.Connect(ctx, connString)
@@ -94,40 +174,44 @@ func queryWorker(ctx context.Context, id int, generator *QueryFieldGenerator, te
 	defer conn.Close(ctx)
 	logger.Info("Query worker connected to db", "id", id)
 
-	queryIndex := int64(id * 1000000) // Offset queries per worker to avoid overlap
-	executedQueries := 0
-	lastJobFinishTime := time.Now()
+	queryIndex := -1
+	successfulQueries := 0
+	failedQueries := 0
 
-	templateNames := make([]string, len(templates.Templates()))
-	for i, tmpl := range templates.Templates() {
-		templateNames[i] = tmpl.Name()
-	}
+	defer func() {
+		logger.Info(
+			"Query worker finished",
+			"id", id,
+			"executedQueries", queryIndex+1,
+			"successfulQueries", successfulQueries,
+			"failedQueries", failedQueries,
+			"ctxErr", ctx.Err(),
+			"usedTemplates", len(templates.Templates()),
+		)
+	}()
 
-	for executedQueries < queries2execute {
+	for {
 		select {
 		case <-ctx.Done():
-			logger.Info("Query worker finished because context is done", "id", id, "executedQueries", executedQueries)
 			return
-		default:
-			// Generate fields for this query
-			fields := generator.GenerateFields(queryIndex)
+		case job, ok := <-jobs:
+			if !ok {
+				logger.Info("Worker closing", "id", id)
+				return
+			}
 			queryIndex++
-
-			// Pick random template
-			templateName := templateNames[int(queryIndex)%len(templateNames)]
 
 			// Execute template with generated fields
 			var query strings.Builder
-			if err := templates.ExecuteTemplate(&query, templateName, fields); err != nil {
-				logger.Error("Query worker failed to execute template", "id", id, "template", templateName, "error", err, "fields", fields)
+			if err := templates.ExecuteTemplate(&query, job.TemplateName, job.Fields); err != nil {
+				logger.Error("Query worker failed to execute template", "id", id, "template", job.TemplateName, "error", err, "fields", job.Fields)
 				continue
 			}
 
-			waitedTime := time.Since(lastJobFinishTime)
+			logger.Debug("Query worker executing query", "id", id, "query", query.String(), "template", job.TemplateName, "fields", job.Fields)
 			querySuccessful := true
 			resultingRowsCount := 0
 			startTime := time.Now()
-
 			rows, err := conn.Query(ctx, query.String())
 			if err != nil {
 				querySuccessful = false
@@ -154,33 +238,33 @@ func queryWorker(ctx context.Context, id int, generator *QueryFieldGenerator, te
 				rows.Close()
 			}
 
+			if querySuccessful {
+				successfulQueries++
+			} else {
+				failedQueries++
+			}
+
 			endTime := time.Now()
 			queryDuration := endTime.Sub(startTime)
 
 			logger.Info("Query worker finished query",
 				"workerId", id,
 				"jobType", "query",
-				"templateName", templateName,
-				"queryDuration", queryDuration,
-				"waitedTime", waitedTime,
+				"templateName", job.TemplateName,
+				"queryDurationInMs", queryDuration.Milliseconds(),
+				"startTime", startTime,
+				"endTime", endTime,
 				"successful", querySuccessful,
 				"queryIndex", queryIndex,
 				"error", err,
 			)
-
-			lastJobFinishTime = time.Now()
-			queryIndex++
-			executedQueries++
 		}
 	}
-
-	logger.Info("Query worker completed all queries", "id", id, "totalQueries", executedQueries)
 }
 
 // QueryFieldGenerator generates random query parameters in a seeded, deterministic manner
 type QueryFieldGenerator struct {
-	baseSeed   int64
-	fieldRands map[string]*rand.Rand
+	baseSeed int64
 
 	// Real data pools from loaded files
 	districts []District
@@ -195,107 +279,67 @@ type QueryFieldGenerator struct {
 // QueryFields contains all possible template parameters
 type QueryFields struct {
 	DistrictName string
-	EndTime      time.Time
+	EndTime      string // RFC3339 string
 	Limit        int
 	POIID        string
 	Radius       float64
-	StartTime    time.Time
-	Timestamp    time.Time
+	StartTime    string // RFC3339 string
+	Timestamp    string // RFC3339 string
 	TripID       string
 }
 
-// ValidateTemplateFields checks if a template contains any undefined field references
-func (qf QueryFields) ValidateTemplateFields(templateName string, templateContent string) error {
-	// Create a test template with strict error checking
-	testTemplate, err := template.New("validation").Option("missingkey=error").Parse(templateContent)
-	if err != nil {
-		return fmt.Errorf("template parsing error: %w", err)
-	}
-
-	// Try to execute the template with our fields
-	var buf bytes.Buffer
-	if err := testTemplate.Execute(&buf, qf); err != nil {
-		return fmt.Errorf("template %s contains undefined fields: %w", templateName, err)
-	}
-
-	return nil
-}
-
 // NewQueryFieldGenerator creates a new seeded field generator
-func NewQueryFieldGenerator(seed int64, districts []District, pois []POI) *QueryFieldGenerator {
-	// Generate realistic trip IDs pool (you could also load these from actual data)
-	tripIDs := make([]string, 10000)
-	tripRand := rand.New(rand.NewSource(seed))
-	for i := range tripIDs {
-		tripIDs[i] = fmt.Sprintf("trip_%06d", tripRand.Intn(100000))
-	}
-
+func NewQueryFieldGenerator(seed int64, districts []District, pois []POI, tripIds []string) *QueryFieldGenerator {
 	// Set realistic time bounds (adjust based on your dataset)
-	minTime := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
+	minTime := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
 	maxTime := time.Date(2025, 12, 31, 23, 59, 59, 0, time.UTC)
 
-	generator := &QueryFieldGenerator{
-		baseSeed:   seed,
-		fieldRands: make(map[string]*rand.Rand),
-		districts:  districts,
-		pois:       pois,
-		tripIDs:    tripIDs,
-		minTime:    minTime,
-		maxTime:    maxTime,
+	return &QueryFieldGenerator{
+		baseSeed:  seed,
+		districts: districts,
+		pois:      pois,
+		tripIDs:   tripIds,
+		minTime:   minTime,
+		maxTime:   maxTime,
 	}
-
-	// Initialize per-field random generators
-	fieldNames := []string{"DistrictName", "EndTime", "Limit", "POIID", "Radius", "StartTime", "Timestamp", "TripID"}
-	for _, fieldName := range fieldNames {
-		fieldSeed := generator.deriveFieldSeed(fieldName, 0)
-		generator.fieldRands[fieldName] = rand.New(rand.NewSource(fieldSeed))
-	}
-
-	return generator
 }
 
-// deriveFieldSeed creates a deterministic seed for a specific field and query index
-func (g *QueryFieldGenerator) deriveFieldSeed(fieldName string, queryIndex int64) int64 {
+// GenerateFields generates all query fields for a specific worker and query index
+func (g *QueryFieldGenerator) GenerateFields(queryIndex int) QueryFields {
+	// Create single deterministic seed for this specific query
 	hash := sha256.New()
 	binary.Write(hash, binary.LittleEndian, g.baseSeed)
-	hash.Write([]byte(fieldName))
 	binary.Write(hash, binary.LittleEndian, queryIndex)
 
 	hashBytes := hash.Sum(nil)
-	return int64(binary.LittleEndian.Uint64(hashBytes[:8]))
-}
+	seed := int64(binary.LittleEndian.Uint64(hashBytes[:8]))
 
-// GenerateFields generates all query fields for a specific query index
-func (g *QueryFieldGenerator) GenerateFields(queryIndex int64) QueryFields {
-	// Update field generators with query-specific seeds
-	for fieldName, fieldRand := range g.fieldRands {
-		fieldSeed := g.deriveFieldSeed(fieldName, queryIndex)
-		fieldRand.Seed(fieldSeed)
-	}
+	// Create single RNG for all fields in this query
+	rng := rand.New(rand.NewSource(seed))
 
 	// Generate start time first
 	timeRange := g.maxTime.Unix() - g.minTime.Unix()
-	startOffset := g.fieldRands["StartTime"].Int63n(timeRange - 3600) // Leave 1 hour for EndTime
+	startOffset := rng.Int63n(timeRange - 3600) // Leave 1 hour for EndTime
 	startTime := time.Unix(g.minTime.Unix()+startOffset, 0)
 
 	// Generate end time after start time (1 minute to 1 hour later)
 	minDuration := int64(60)   // 1 minute
 	maxDuration := int64(3600) // 1 hour
-	duration := minDuration + g.fieldRands["EndTime"].Int63n(maxDuration-minDuration)
+	duration := minDuration + rng.Int63n(maxDuration-minDuration)
 	endTime := startTime.Add(time.Duration(duration) * time.Second)
 
 	// Generate single timestamp within reasonable bounds
-	timestampOffset := g.fieldRands["Timestamp"].Int63n(timeRange)
+	timestampOffset := rng.Int63n(timeRange)
 	timestamp := time.Unix(g.minTime.Unix()+timestampOffset, 0)
 
 	return QueryFields{
-		DistrictName: g.districts[g.fieldRands["DistrictName"].Intn(len(g.districts))].Name,
-		EndTime:      endTime,
-		Limit:        1 + g.fieldRands["Limit"].Intn(100), // 1-100
-		POIID:        g.pois[g.fieldRands["POIID"].Intn(len(g.pois))].POIID,
-		Radius:       50.0 + g.fieldRands["Radius"].Float64()*1950.0, // 50-2000 meters
-		StartTime:    startTime,
-		Timestamp:    timestamp,
-		TripID:       g.tripIDs[g.fieldRands["TripID"].Intn(len(g.tripIDs))],
+		DistrictName: g.districts[rng.Intn(len(g.districts))].Name,
+		EndTime:      endTime.Format(time.RFC3339),
+		Limit:        1 + rng.Intn(100), // 1-100
+		POIID:        g.pois[rng.Intn(len(g.pois))].POIID,
+		Radius:       50.0 + rng.Float64()*1950.0, // 50-2000 meters
+		StartTime:    startTime.Format(time.RFC3339),
+		Timestamp:    timestamp.Format(time.RFC3339),
+		TripID:       g.tripIDs[rng.Intn(len(g.tripIDs))],
 	}
 }

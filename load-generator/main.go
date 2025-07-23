@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"text/template"
@@ -77,12 +78,13 @@ func main() {
 		tripsPath          = flag.String("trips", "../dataset-generator/output/escooter-trips-small.csv", "Path to a CSV file containing the escooter trip events")
 		ddlPath            = flag.String("ddl", "./schemas/cratedb-ddl.sql", "File containing the DDL for creating database tables")
 		mode               = flag.String("mode", "insert", "Mode: insert, query")
-		numWorkers         = flag.Int("nworkers", 100, "Number of simultanious workers for the benchmark to use")
-		skipInitialization = flag.Bool("skip-init", false, "Skip database initialization (creating tables, inserting POIs, and districts")
+		numWorkers         = flag.Int("nworkers", 24, "Number of simultanious workers for the benchmark to use")
+		skipInitialization = flag.Bool("skip-init", false, "[Only valid in insert mode] Skip database initialization (creating tables, inserting POIs, and districts)")
 		logDebug           = flag.Bool("log-debug", false, "Turn on the DEBUG level for logging")
-		queriesPerWorker   = flag.Int("queries-per-worker", 100, "Number of queries each worker should execute")
+		queriesNum         = flag.Int("nqueries", 100, "Number of queries to execute")
 		randomSeed         = flag.Int64("seed", 42, "Random seed for deterministic query generation")
 		templatesFilepath  = flag.String("qtemplates", "./schemas/cratedb-simple-read-queries.tmpl", "Path to a file containing query templates")
+		tripEventsCSV      = flag.String("tevents", "../dataset-generator/output/escooter-trips-small.csv", "Path to a CSV file containing trip events")
 	)
 	flag.Parse()
 
@@ -95,6 +97,22 @@ func main() {
 		Level: level,
 	})
 	logger = slog.New(handler)
+
+	logger.Info("Starting load-generator with following cli arguments",
+		"db", dbTargetStr,
+		"districts", districtsPath,
+		"pois", poisPath,
+		"trips", tripsPath,
+		"ddl", ddlPath,
+		"mode", mode,
+		"nworkers", numWorkers,
+		"skip-init", skipInitialization,
+		"log-debug", logDebug,
+		"queries-per-worker", queriesNum,
+		"seed", randomSeed,
+		"qtemplates", templatesFilepath,
+		"tevents", tripEventsCSV,
+	)
 
 	var connString string
 	var dbTarget DBTarget
@@ -118,6 +136,7 @@ func main() {
 
 	switch *mode {
 	case "insert":
+		// initialize tables and insert POIs and Districts
 		if *skipInitialization {
 			logger.Info("Skipping initialization because of the CLI flag")
 		} else {
@@ -129,12 +148,14 @@ func main() {
 			ddl := string(ddlB)
 			mustInitializeDb(ctx, connString, dbTarget, pois, districts, ddl)
 		}
+
 		benchmarkInserts(ctx, connString, *numWorkers, dbTarget, *tripsPath)
 
 	case "query":
-		queryTemplates := template.Must(template.New("").ParseFiles(*templatesFilepath))
+		queryTemplates := mustLoadTemplates(*templatesFilepath)
+
 		logger.Info("Loaded read queries templates", "count", len(queryTemplates.Templates()))
-		benchmarkQueries(ctx, connString, *numWorkers, dbTarget, districts, pois, queryTemplates, *queriesPerWorker, *randomSeed)
+		benchmarkQueries(ctx, connString, *numWorkers, dbTarget, *tripEventsCSV, districts, pois, queryTemplates, *queriesNum, *randomSeed)
 
 	default:
 		logger.Error("unknown mode", "mode", *mode)
@@ -204,4 +225,22 @@ func mustLoadDistricts(path string) []District {
 		districts = append(districts, d)
 	}
 	return districts
+}
+
+func mustLoadTemplates(templatesFilepath string) *template.Template {
+	allTemplates := template.Must(template.ParseFiles(templatesFilepath))
+
+	// filter out the tempate with the file name
+	queryTemplates := template.New("").Option("missingkey=error")
+	for _, tmpl := range allTemplates.Templates() {
+		if tmpl.Name() == filepath.Base(templatesFilepath) {
+			continue
+		}
+		// Re-parse the content of each template into the new set
+		_, err := queryTemplates.New(tmpl.Name()).Parse(tmpl.Tree.Root.String())
+		if err != nil {
+			logger.Error("Error parising a template")
+		}
+	}
+	return queryTemplates
 }

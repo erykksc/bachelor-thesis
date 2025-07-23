@@ -1,7 +1,13 @@
 {{define "TripLength"}}
-SELECT SUM(distance(e.geo_point, LEAD(e.geo_point) OVER (ORDER BY e.timestamp))) AS trip_length_m
-FROM escooter_events e
-WHERE e.trip_id = '{{.TripID}}';
+SELECT SUM(distance(geo_point, next_geo)) AS trip_length_m
+FROM (
+  SELECT
+    geo_point,
+    LEAD(geo_point) OVER (ORDER BY "timestamp") AS next_geo
+  FROM escooter_events
+  WHERE trip_id = '{{.TripID}}'
+) t
+WHERE next_geo IS NOT NULL;
 {{end}}
 
 {{define "EscooterTraceByTripID"}}
@@ -12,9 +18,14 @@ ORDER BY timestamp;
 {{end}}
 
 {{define "LastKnownLocationPerTrip"}}
-SELECT DISTINCT ON (trip_id) trip_id, geo_point, timestamp
-FROM escooter_events
-ORDER BY trip_id, timestamp DESC;
+SELECT trip_id, geo_point, timestamp
+FROM (
+    SELECT *,
+           ROW_NUMBER() OVER (PARTITION BY trip_id ORDER BY timestamp DESC) AS rn
+    FROM escooter_events
+) t
+WHERE rn = 1
+LIMIT {{.Limit}};
 {{end}}
 
 {{define "EscootersInDistricsInTimeRange"}}
@@ -23,7 +34,7 @@ FROM escooter_events e
 JOIN districts d
   ON within(e.geo_point, d.geo_shape)
 WHERE d.name = '{{.DistrictName}}'
-  AND e.timestamp BETWEEN {{.StartTime}} AND {{.EndTime}};
+  AND e.timestamp BETWEEN '{{.StartTime}}' AND '{{.EndTime}}';
 {{end}}
 
 {{define "EscooterEventsNearPoiInTimeRange"}}
@@ -32,7 +43,7 @@ FROM escooter_events e
 JOIN pois p
   ON distance(e.geo_point, p.geo_point) < {{.Radius}}
 WHERE p.poi_id = '{{.POIID}}'
-  AND e.timestamp BETWEEN {{.StartTime}} AND {{.EndTime}};
+  AND e.timestamp BETWEEN '{{.StartTime}}' AND '{{.EndTime}}';
 {{end}}
 
 {{define "EscootersAtTimeInDistrict"}}
@@ -41,7 +52,7 @@ FROM escooter_events e
 JOIN districts d
   ON within(e.geo_point, d.geo_shape)
 WHERE d.name = '{{.DistrictName}}'
-  AND e.timestamp = {{.Timestamp}};
+  AND e.timestamp = '{{.Timestamp}}';
 {{end}}
 
 {{define "NearestEscooterToPOIAtTime"}}
@@ -50,21 +61,9 @@ SELECT e.trip_id,
 FROM escooter_events e
 JOIN pois p
   ON p.poi_id = '{{.POIID}}'
-WHERE e.timestamp = {{.Timestamp}}
+WHERE e.timestamp = '{{.Timestamp}}'
 ORDER BY dist
 LIMIT 1;
-{{end}}
-
-{{define "CountEventsInDistrictPerHour"}}
-SELECT
-    DATE_BIN('1 hour', e.timestamp, '2025-01-01') AS hour,
-    COUNT(*) AS event_count
-FROM escooter_events e
-JOIN districts d
-  ON within(e.geo_point, d.geo_shape)
-WHERE d.name = '{{.DistrictName}}'
-GROUP BY hour
-ORDER BY hour;
 {{end}}
 
 {{define "EscootersNearPOI"}}
@@ -75,9 +74,10 @@ JOIN pois p
 WHERE p.poi_id = '{{.POIID}}';
 {{end}}
 
-{{define "SpatiotemporalJoinPOI"}}
+{{define "EscootersWithPOIsInRadiusOfEachOther"}}
 SELECT e.*, p.*
 FROM escooter_events e
 JOIN pois p
-  ON distance(e.geo_point, p.geo_point) < {{.Radius}};
+  ON distance(e.geo_point, p.geo_point) < {{.Radius}}
+LIMIT {{.Limit}};
 {{end}}
