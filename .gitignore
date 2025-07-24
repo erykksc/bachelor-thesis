@@ -3,6 +3,7 @@
 .direnv/
 .envrc
 dataset-generator/output/
+dataset-generator/.venv/
 dataset-generator/cache/
 
 # Terraform/ opentofu
@@ -11,6 +12,8 @@ dataset-generator/cache/
 *.tfvars
 opentofu/.terraform/
 **/*.tofuplan
+**/.terraform/
+
 
 *.bbl
 *.out
