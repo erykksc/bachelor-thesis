@@ -17,7 +17,7 @@ func benchmarkInserts(ctx context.Context, connString string, numWorkers int, db
 	logger.Info("Starting Insert Benchmark", "dbConnString", connString, "numWorkers", numWorkers, "dbTarget", dbTarget, "tripsFilename", tripsFilename)
 	// create specified number of workers
 	var wg sync.WaitGroup
-	jobs := make(chan *TripEvent, runtime.NumCPU()*4) // larger buffer to combat workers waiting for main thread to read the csv file
+	jobs := make(chan TripEvent, runtime.NumCPU()*100) // larger buffer to combat workers waiting for main thread to read the csv file
 	for i := 1; i <= numWorkers; i++ {
 		wg.Add(1)
 		go func(id int) {
@@ -55,7 +55,7 @@ csvScanLoop:
 			os.Exit(1)
 		}
 
-		tripEvent := &TripEvent{
+		tripEvent := TripEvent{
 			EventID:   rec[0],
 			TripID:    rec[1],
 			Timestamp: rec[2],
@@ -69,6 +69,9 @@ csvScanLoop:
 		case jobs <- tripEvent:
 		}
 		tripEventsCount++
+		if tripEventsCount%10000 == 0 {
+			logger.Info("Insert progress", "totalInserted", tripEventsCount)
+		}
 	}
 
 	close(jobs)
@@ -84,7 +87,7 @@ csvScanLoop:
 //   - the time it took to insert (if provided in the response)
 //   - the latency of getting a response
 //   - time spend waiting for receiving the next job through channel
-func insertWorker(ctx context.Context, id int, tripEvents <-chan *TripEvent, connString string, dbTarget DBTarget) {
+func insertWorker(ctx context.Context, id int, tripEvents <-chan TripEvent, connString string, dbTarget DBTarget) {
 	logger.Info("Worker started", "id", id)
 
 	conn, err := pgx.Connect(ctx, connString)
@@ -153,8 +156,8 @@ func insertWorker(ctx context.Context, id int, tripEvents <-chan *TripEvent, con
 				"jobType", "insert",
 				"startTime", startTime,
 				"endTime", endTime,
-				"insertTime", endTime.Sub(startTime).Milliseconds(),
-				"waitedForJobTime", waitedForJobTime.Milliseconds(),
+				"insertTimeInMs", endTime.Sub(startTime).Milliseconds(),
+				"waitedForJobTimeInMs", waitedForJobTime.Milliseconds(),
 				"successful", querySuccessful,
 				"cmdTag", cmdTag,
 				"queryErr", err,
@@ -166,7 +169,7 @@ func insertWorker(ctx context.Context, id int, tripEvents <-chan *TripEvent, con
 	}
 }
 
-func getInsertTripEventCratedbSql(tEvent *TripEvent) string {
+func getInsertTripEventCratedbSql(tEvent TripEvent) string {
 	return fmt.Sprintf(`
 	INSERT INTO escooter_events (
 		event_id,
@@ -179,7 +182,7 @@ func getInsertTripEventCratedbSql(tEvent *TripEvent) string {
 	);`, tEvent.EventID, tEvent.TripID, tEvent.Timestamp, tEvent.Latitude, tEvent.Longitude)
 }
 
-func getInsertTripEventMobilitydbSql(tEvent *TripEvent) string {
+func getInsertTripEventMobilitydbSql(tEvent TripEvent) string {
 	return fmt.Sprintf(`
 	INSERT INTO escooter_events (
 		event_id,

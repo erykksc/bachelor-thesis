@@ -72,16 +72,17 @@ func main() {
 	defer stop()
 	// CLI flags
 	var (
-		dbTargetStr        = flag.String("db", "cratedb", "Target database: cratedb or mobilitydb")
+		dbTargetStr        = flag.String("dbTarget", "cratedb", "Target database: cratedb or mobilitydb")
+		connString         = flag.String("db", "postgresql://crate:crate@localhost:5432/doc", "Connection string to use to connect to db")
 		districtsPath      = flag.String("districts", "../dataset-generator/output/berlin-districts.geojson", "Path to a file containing districts")
 		poisPath           = flag.String("pois", "../dataset-generator/output/berlin-pois.csv", "Path to a file containing POIs")
 		tripsPath          = flag.String("trips", "../dataset-generator/output/escooter-trips-small.csv", "Path to a CSV file containing the escooter trip events")
 		ddlPath            = flag.String("ddl", "./schemas/cratedb-ddl.sql", "File containing the DDL for creating database tables")
-		mode               = flag.String("mode", "insert", "Mode: insert, query")
+		mode               = flag.String("mode", "insert", "Mode: insert, query, init")
 		numWorkers         = flag.Int("nworkers", 24, "Number of simultanious workers for the benchmark to use")
 		skipInitialization = flag.Bool("skip-init", false, "[Only valid in insert mode] Skip database initialization (creating tables, inserting POIs, and districts)")
 		logDebug           = flag.Bool("log-debug", false, "Turn on the DEBUG level for logging")
-		queriesNum         = flag.Int("nqueries", 100, "Number of queries to execute")
+		numQueries         = flag.Int("nqueries", 100, "Number of queries to execute")
 		randomSeed         = flag.Int64("seed", 42, "Random seed for deterministic query generation")
 		templatesFilepath  = flag.String("qtemplates", "./schemas/cratedb-simple-read-queries.tmpl", "Path to a file containing query templates")
 		tripEventsCSV      = flag.String("tevents", "../dataset-generator/output/escooter-trips-small.csv", "Path to a CSV file containing trip events")
@@ -108,21 +109,18 @@ func main() {
 		"nworkers", numWorkers,
 		"skip-init", skipInitialization,
 		"log-debug", logDebug,
-		"queries-per-worker", queriesNum,
+		"queries-per-worker", numQueries,
 		"seed", randomSeed,
 		"qtemplates", templatesFilepath,
 		"tevents", tripEventsCSV,
 	)
 
-	var connString string
 	var dbTarget DBTarget
 	switch *dbTargetStr {
 	case "cratedb":
 		dbTarget = CrateDB
-		connString = "postgresql://crate:crate@localhost:5432/doc"
 	case "mobilitydb":
 		dbTarget = MobilityDB
-		connString = "postgres://user:pass@localhost:5432/yourdb"
 	default:
 		logger.Error("Invalid CLI argument", "argument", "dbTarget", "value", *dbTargetStr, "expected", "cratedb|mobilitydb")
 		os.Exit(1)
@@ -135,27 +133,24 @@ func main() {
 	logger.Info("Loaded and parsed pois", "count", len(pois))
 
 	switch *mode {
-	case "insert":
+	case "init":
 		// initialize tables and insert POIs and Districts
-		if *skipInitialization {
-			logger.Info("Skipping initialization because of the CLI flag")
-		} else {
-			ddlB, err := os.ReadFile(*ddlPath)
-			if err != nil {
-				logger.Error("Error reading DDL file", "error", err)
-				os.Exit(1)
-			}
-			ddl := string(ddlB)
-			mustInitializeDb(ctx, connString, dbTarget, pois, districts, ddl)
+		ddlB, err := os.ReadFile(*ddlPath)
+		if err != nil {
+			logger.Error("Error reading DDL file", "error", err)
+			os.Exit(1)
 		}
+		ddl := string(ddlB)
+		mustInitializeDb(ctx, *connString, dbTarget, pois, districts, ddl)
 
-		benchmarkInserts(ctx, connString, *numWorkers, dbTarget, *tripsPath)
+	case "insert":
+		benchmarkInserts(ctx, *connString, *numWorkers, dbTarget, *tripsPath)
 
 	case "query":
 		queryTemplates := mustLoadTemplates(*templatesFilepath)
 
 		logger.Info("Loaded read queries templates", "count", len(queryTemplates.Templates()))
-		benchmarkQueries(ctx, connString, *numWorkers, dbTarget, *tripEventsCSV, districts, pois, queryTemplates, *queriesNum, *randomSeed)
+		benchmarkQueries(ctx, *connString, *numWorkers, dbTarget, *tripEventsCSV, districts, pois, queryTemplates, *numQueries, *randomSeed)
 
 	default:
 		logger.Error("unknown mode", "mode", *mode)

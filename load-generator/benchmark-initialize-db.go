@@ -51,9 +51,9 @@ func mustInitializeDb(ctx context.Context, connString string, dbTarget DBTarget,
 			logger.Error("Error executing poi insert query", "error", err, "poiData", poi)
 			os.Exit(1)
 		}
-		logger.Debug("Inserted POI", "poi", poi)
+		logger.Info("Inserted POI", "poi", poi)
 	}
-	logger.Info("Inserted all POIs into database", "dbTarget", dbTarget, "poiCount", len(pois), "timeElapsed", time.Since(startTime))
+	logger.Info("Inserted all POIs into database", "dbTarget", dbTarget, "poiCount", len(pois), "timeElapsedInSec", time.Since(startTime).Seconds())
 
 	// Insert districts
 	startTime = time.Now()
@@ -63,9 +63,9 @@ func mustInitializeDb(ctx context.Context, connString string, dbTarget DBTarget,
 			logger.Error("Error executing district insert query", "error", err, "districtData", district.String())
 			os.Exit(1)
 		}
-		logger.Debug("Inserted District", "district", district.String())
+		logger.Info("Inserted District", "district", district.String())
 	}
-	logger.Info("Inserted all districts into database", "dbTarget", dbTarget, "districtCount", len(pois), "timeElapsed", time.Since(startTime))
+	logger.Info("Inserted all districts into database", "dbTarget", dbTarget, "districtCount", len(pois), "timeElapsedInSec", time.Since(startTime).Seconds())
 }
 
 func insertPoiToCratedb(ctx context.Context, conn *pgx.Conn, poi *POI) error {

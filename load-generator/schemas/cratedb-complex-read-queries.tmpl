@@ -18,7 +18,7 @@ ORDER BY trip_count DESC
 
 {{define "EventDensityHeatmapPerDistrict"}}
 SELECT d.name AS district,
-       DATE_BIN(INTERVAL '1 hour', e.timestamp, TIMESTAMP '2020-01-01') AS hour,
+       DATE_BIN(INTERVAL '1 hour', e.timestamp, TIMESTAMP '2000-01-01 00:00:00+00:00') AS hour,
        COUNT(*) AS event_count
 FROM escooter_events e
 JOIN districts d ON within(e.geo_point, d.geo_shape)
@@ -76,7 +76,7 @@ ORDER BY trip_count DESC
 
 {{define "CountEventsInDistrictPerHour"}}
 SELECT
-    DATE_BIN(INTERVAL '1 hour', e.timestamp, TIMESTAMP '2020-01-01') AS hour,
+    DATE_BIN(INTERVAL '1 hour', e.timestamp, TIMESTAMP '2000-01-01 00:00:00+00:00') AS hour,
     COUNT(*) AS event_count
 FROM escooter_events e
 JOIN districts d

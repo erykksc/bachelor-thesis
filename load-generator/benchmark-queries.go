@@ -40,7 +40,7 @@ func benchmarkQueries(ctx context.Context, connString string, numWorkers int, db
 	logger.Info("Using query templates", "count", len(queryTemplates.Templates()))
 
 	// Start workers
-	jobs := make(chan QueryJob, runtime.NumCPU()*4) // larger buffer to combat workers waiting for main thread to read the csv file
+	jobs := make(chan QueryJob, runtime.NumCPU()*100) // larger buffer to combat workers waiting for main thread to read the csv file
 	var wg sync.WaitGroup
 	for i := 1; i <= numWorkers; i++ {
 		wg.Add(1)
