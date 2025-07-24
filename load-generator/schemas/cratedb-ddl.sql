@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS escooter_events (
+CREATE TABLE IF NOT EXITS escooter_events (
     event_id TEXT PRIMARY KEY,
     trip_id TEXT,
     timestamp TIMESTAMP,
@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS pois (
     category TEXT,
     geo_point GEO_POINT
 )
-CLUSTERED INTO 1 SHARD
+CLUSTERED INTO 1 SHARDS
 WITH ("number_of_replicas" = 'all');
 
 CREATE TABLE IF NOT EXISTS districts (
@@ -21,5 +21,5 @@ CREATE TABLE IF NOT EXISTS districts (
     name TEXT,
     geo_shape GEO_SHAPE
 )
-CLUSTERED INTO 1 SHARD
+CLUSTERED INTO 1 SHARDS
 WITH ("number_of_replicas" = 'all');
