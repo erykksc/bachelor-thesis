@@ -13,8 +13,8 @@ namespace: "default"
 # statefulset name
 cratadbStatefulsetName: crate-set
 
-# heap size ( default value set to 256 megabytes, half of requested memory)
-heapSize: 1G
+# heap size (recommended starting point is 25% of memory)
+heapSize: 2G
 
 # crateDB internal service
 internalService:
