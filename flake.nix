@@ -17,16 +17,17 @@
       {
         devShells.default = pkgs.mkShell {
           packages = [
+            # pkgs.texliveFull
             pkgs.azure-cli
             pkgs.gnumake
+            pkgs.go
             pkgs.kubectl
             pkgs.kubernetes-helm
             pkgs.nixfmt-rfc-style
             pkgs.opentofu
-            pkgs.tectonic
-            # pkgs.texliveFull
-            pkgs.uv
             pkgs.postgresql_17
+            pkgs.tectonic
+            pkgs.uv
           ];
         };
       }
