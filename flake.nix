@@ -21,6 +21,7 @@
             pkgs.azure-cli
             pkgs.gnumake
             pkgs.go
+            pkgs.golangci-lint
             pkgs.kubectl
             pkgs.kubernetes-helm
             pkgs.nixfmt-rfc-style
