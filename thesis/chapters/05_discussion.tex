@@ -20,6 +20,13 @@ Furthermore, a more realistic workload could be benchmarked, such as a trace bas
 
 The systems would also need to be evaluated when nodes of the DDBMS would be running on bare metal servers, not on top of Kubernetes inside docker containers as containerization alongside the Kubernetes overhead could impact the results.
 
+It would be worth checking how the systems would perform when replication would be enabled.
+
 Consistency has not been evaluated, as \mobilitydbc supports ACID compliant transactions and CrateDB guarantees only eventual consistency.
 Future research could check how much time does CrateDB need to get into consistent state.
 One could also evaluate the performance and scalability of \mobilitydbc with transactions and without them.
+
+\subsection{Lessons learned}
+
+There is a big speed difference in iops and thus database performance on PVCs for kubernetes in azure cloud.
+The disks provided with VMs are much faster otherwise the disk speed (IOPS) depends on the allocated storage
