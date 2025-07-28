@@ -99,6 +99,9 @@ spec:
           volumeMounts:
             - mountPath: {{ .Values.cratedbConfig.dataPath }}
               name: cratedb-data-volume
+      volumes:
+        - name: cratedb-data-volume
+          emptyDir: {}
       {{- with .Values.nodeSelector }}
       nodeSelector:
       {{- toYaml . | nindent 8 }}
@@ -111,15 +114,3 @@ spec:
       tolerations:
       {{- toYaml . | nindent 8 }}
       {{- end }}
-  volumeClaimTemplates:
-    - metadata:
-        name: cratedb-data-volume
-      spec:
-        storageClassName: {{ .Values.persistentVolume.storageClassName }}
-        accessModes:
-          {{- range .Values.persistentVolume.accessModes }}
-          - {{ . | quote }}
-          {{- end }}
-        resources:
-          requests:
-            storage: {{ .Values.persistentVolume.size | quote }}

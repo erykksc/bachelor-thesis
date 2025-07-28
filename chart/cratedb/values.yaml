@@ -52,12 +52,8 @@ image:
 nameOverride: ""
 fullnameOverride: ""
 
-## The storage volume used by each Pod in the crateDB StatefulSet.
-persistentVolume:
-  accessModes:
-    - ReadWriteOnce
-  size: 100Gi
-  storageClassName: "crate-premium"
+# Ephemeral storage - no persistent volumes configured
+# Data will be stored in emptyDir volumes that are deleted when pods are removed
 
 ## CrateDB configuration settings. These values passed as arguments of crateDB
 cratedbConfig:
