@@ -6,18 +6,17 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"runtime"
 	"sync"
 	"time"
 
 	"github.com/jackc/pgx/v5"
 )
 
-func benchmarkInserts(ctx context.Context, connString string, numWorkers int, dbTarget DBTarget, tripsFilename string) {
+func benchmarkInserts(ctx context.Context, connString string, numWorkers int, batchSize int, dbTarget DBTarget, tripsFilename string) {
 	logger.Info("Starting Insert Benchmark", "dbConnString", connString, "numWorkers", numWorkers, "dbTarget", dbTarget, "tripsFilename", tripsFilename)
 	// create specified number of workers
 	var wg sync.WaitGroup
-	jobs := make(chan TripEvent, runtime.NumCPU()*100) // larger buffer to combat workers waiting for main thread to read the csv file
+	jobs := make(chan []TripEvent, numWorkers*5) // batches of events
 	for i := 1; i <= numWorkers; i++ {
 		wg.Add(1)
 		go func(id int) {
@@ -42,13 +41,23 @@ func benchmarkInserts(ctx context.Context, connString string, numWorkers int, db
 		os.Exit(1)
 	}
 
-	// read the trips csv and send the jobs to workers
+	// read the trips csv and send batches to workers
 	startTime := time.Now()
 	tripEventsCount := 0
+	batch := make([]TripEvent, 0, batchSize)
+
 csvScanLoop:
 	for {
 		rec, err := r.Read()
 		if err == io.EOF {
+			// Send remaining batch if not empty
+			if len(batch) > 0 {
+				select {
+				case <-ctx.Done():
+					break csvScanLoop
+				case jobs <- batch:
+				}
+			}
 			break
 		} else if err != nil {
 			logger.Error("Error in read of trips csv", "error", err)
@@ -63,14 +72,21 @@ csvScanLoop:
 			Longitude: rec[4],
 		}
 
-		select {
-		case <-ctx.Done():
-			break csvScanLoop
-		case jobs <- tripEvent:
-		}
+		batch = append(batch, tripEvent)
 		tripEventsCount++
+
+		// Send batch when full
+		if len(batch) >= batchSize {
+			select {
+			case <-ctx.Done():
+				break csvScanLoop
+			case jobs <- batch:
+			}
+			batch = make([]TripEvent, 0, batchSize)
+		}
+
 		if tripEventsCount%10000 == 0 {
-			logger.Info("Insert progress", "totalInserted", tripEventsCount)
+			logger.Info("Insert progress", "totalInsertedToJobQueue", tripEventsCount, "timeElapsedInSec", time.Since(startTime).Seconds())
 		}
 	}
 
@@ -87,7 +103,7 @@ csvScanLoop:
 //   - the time it took to insert (if provided in the response)
 //   - the latency of getting a response
 //   - time spend waiting for receiving the next job through channel
-func insertWorker(ctx context.Context, id int, tripEvents <-chan TripEvent, connString string, dbTarget DBTarget) {
+func insertWorker(ctx context.Context, id int, tripEventBatches <-chan []TripEvent, connString string, dbTarget DBTarget) {
 	logger.Info("Worker started", "id", id)
 
 	conn, err := pgx.Connect(ctx, connString)
@@ -96,7 +112,7 @@ func insertWorker(ctx context.Context, id int, tripEvents <-chan TripEvent, conn
 		os.Exit(1)
 	}
 	defer conn.Close(ctx)
-	logger.Info("Worker conntected to db", "id", id)
+	logger.Info("Worker connected to db", "id", id)
 
 	getInsertTripEventSql := getInsertTripEventCratedbSql
 	switch dbTarget {
@@ -106,7 +122,6 @@ func insertWorker(ctx context.Context, id int, tripEvents <-chan TripEvent, conn
 		getInsertTripEventSql = getInsertTripEventMobilitydbSql
 	}
 
-	insertsAttempted := 0
 	insertedEvents := 0
 	failedInserts := 0
 
@@ -114,7 +129,6 @@ func insertWorker(ctx context.Context, id int, tripEvents <-chan TripEvent, conn
 		logger.Info(
 			"Insert worker finished",
 			"id", id,
-			"insertsAttempted", insertsAttempted,
 			"insertedEvents", insertedEvents,
 			"failedInserts", failedInserts,
 			"ctxErr", ctx.Err(),
@@ -127,44 +141,54 @@ func insertWorker(ctx context.Context, id int, tripEvents <-chan TripEvent, conn
 		case <-ctx.Done():
 			logger.Info("Worker finished because the passed context is marked as done", "id", id)
 			return
-		case tEvent, ok := <-tripEvents:
+		case batch, ok := <-tripEventBatches:
 			if !ok {
 				logger.Info("Worker finished", "id", id)
 				return
 			}
 
-			logger.Debug("Worker: tripEvent received, inserting into db...", "id", id, "eventId", tEvent.EventID)
+			logger.Debug("Worker: batch received, inserting into db...", "id", id, "batchSize", len(batch))
 
 			waitedForJobTime := time.Since(lastJobFinishTime)
 
-			query := getInsertTripEventSql(tEvent)
-
-			insertsAttempted++
-			querySuccessful := true
+			successfullInserts := len(batch)
 			startTime := time.Now()
-			cmdTag, err := conn.Exec(ctx, query)
-			if err != nil {
-				querySuccessful = false
-				insertedEvents++
-			} else {
-				failedInserts++
+
+			// Use pgx batch for efficient batch inserts
+			pgxBatch := &pgx.Batch{}
+			for _, tEvent := range batch {
+				query := getInsertTripEventSql(tEvent)
+				pgxBatch.Queue(query)
 			}
 
+			batchResults := conn.SendBatch(ctx, pgxBatch)
+			eventsInBatch := len(batch)
+			for range eventsInBatch {
+				_, err := batchResults.Exec()
+				if err != nil {
+					successfullInserts--
+					failedInserts++
+					logger.Debug("Error inserting escooter event", "worker", id, "error", err)
+				} else {
+					insertedEvents++
+				}
+			}
+			batchResults.Close()
+
 			endTime := time.Now()
-			logger.Info("Worker finished insert",
+			logger.Info("Worker finished batch insert",
 				"workerId", id,
-				"jobType", "insert",
+				"jobType", "batch_insert",
+				"batchSize", eventsInBatch,
 				"startTime", startTime,
 				"endTime", endTime,
 				"insertTimeInMs", endTime.Sub(startTime).Milliseconds(),
 				"waitedForJobTimeInMs", waitedForJobTime.Milliseconds(),
-				"successful", querySuccessful,
-				"cmdTag", cmdTag,
-				"queryErr", err,
+				"successfullyInserted", successfullInserts,
 			)
 			lastJobFinishTime = time.Now()
 
-			logger.Debug("Worker: tripEvent inserted into db", "id", id, "eventId", tEvent.EventID)
+			logger.Debug("Worker: batch inserted into db", "id", id, "batchSize", len(batch))
 		}
 	}
 }
@@ -191,9 +215,9 @@ func getInsertTripEventMobilitydbSql(tEvent TripEvent) string {
 		location
 	)
 	VALUES (
-		%s, 
-		%s,
-		%s,
+		'%s', 
+		'%s',
+		'%s',
 		tgeompoint 'Point(%s %s)@%s'
 	);`, tEvent.EventID, tEvent.TripID, tEvent.Timestamp, tEvent.Longitude, tEvent.Latitude, tEvent.Timestamp)
 }

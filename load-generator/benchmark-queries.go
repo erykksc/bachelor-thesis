@@ -32,7 +32,7 @@ func benchmarkQueries(ctx context.Context, connString string, numWorkers int, db
 	generator := NewQueryFieldGenerator(seed, districts, pois, tripIds)
 
 	queryTemplates = queryTemplates.Option("missingkey=error")
-	err := ValidateTempaltes(ctx, queryTemplates, connString, generator)
+	err := ValidateTemplates(ctx, queryTemplates, connString, generator)
 	if err != nil {
 		logger.Error("Not all templates passed the validation, stopping benchmark", "error", err)
 		return
@@ -77,7 +77,7 @@ func benchmarkQueries(ctx context.Context, connString string, numWorkers int, db
 	}
 }
 
-func ValidateTempaltes(ctx context.Context, templates *template.Template, connString string, generator *QueryFieldGenerator) error {
+func ValidateTemplates(ctx context.Context, templates *template.Template, connString string, generator *QueryFieldGenerator) error {
 	templates = templates.Option("missingkey=error")
 
 	conn, err := pgx.Connect(ctx, connString)
@@ -104,7 +104,6 @@ func ValidateTempaltes(ctx context.Context, templates *template.Template, connSt
 		}
 
 		rows, err := conn.Query(ctx, query.String())
-		defer rows.Close()
 		if err != nil {
 			logger.Error("Template validation failed on querying the database", "template", tmpl.Name(), "error", err, "query", query.String())
 			return err

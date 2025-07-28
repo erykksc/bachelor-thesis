@@ -1,0 +1,14 @@
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  labels:
+    {{- include "cratedb.labels" . | nindent 4 }}
+    storage-tier: premium
+    volume-type: ssd
+  name: {{ .Values.persistentVolume.storageClassName }}
+parameters:
+  kind: Managed
+  storageaccounttype: Premium_LRS
+provisioner: kubernetes.io/azure-disk
+reclaimPolicy: Delete
+volumeBindingMode: Immediate

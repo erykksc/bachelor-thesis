@@ -1,0 +1,5 @@
+You should see the mobilitydb using:
+```bash
+kubectl get pods
+kubectl get service
+```

@@ -2,15 +2,18 @@ CREATE EXTENSION IF NOT EXISTS citus;
 CREATE EXTENSION IF NOT EXISTS postgis;
 CREATE EXTENSION IF NOT EXISTS mobilitydb CASCADE;
 
-CREATE TABLE escooter_events (
+DROP TABLE IF EXISTS escooter_events;
+DROP TABLE IF EXISTS pois;
+DROP TABLE IF EXISTS districts;
+
+CREATE TABLE IF NOT EXISTS escooter_events (
     event_id UUID PRIMARY KEY,
     trip_id UUID,
     timestamp TIMESTAMP,
     location tgeompoint
 );
 
-
--- Distribute by trip_id (hash); keep rows of same trip together
+-- Distribute by trip_id (hash), keep rows of same trip together
 SELECT create_distributed_table(
     'escooter_events',
     'trip_id',
@@ -19,16 +22,17 @@ SELECT create_distributed_table(
     colocate_with => NULL       -- set to another table if you want co-location
 );
 
--- Indexes will be created separately after tables due to CONCURRENTLY requirement
+CREATE INDEX CONCURRENTLY IF NOT EXISTS escooter_events_ts_idx ON escooter_events ("timestamp");
+CREATE INDEX CONCURRENTLY IF NOT EXISTS escooter_events_loc_gist ON escooter_events USING GIST (location);
 
-CREATE TABLE pois (
+CREATE TABLE IF NOT EXISTS pois (
     poi_id UUID PRIMARY KEY,
     name TEXT,
     category TEXT,
     geom geometry(Point, 4326)
 );
 
-CREATE TABLE districts (
+CREATE TABLE IF NOT EXISTS districts (
     district_id UUID PRIMARY KEY,
     name TEXT,
     geom geometry(MultiPolygon, 4326)

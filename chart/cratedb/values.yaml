@@ -54,16 +54,14 @@ fullnameOverride: ""
 
 ## The storage volume used by each Pod in the crateDB StatefulSet.
 persistentVolume:
-  enabled: false
   accessModes:
     - ReadWriteOnce
-  size: 10Gi
-#  storageClass: "-"
+  size: 100Gi
+  storageClassName: "crate-premium"
 
 ## CrateDB configuration settings. These values passed as arguments of crateDB
 cratedbConfig:
   dataPath: "/data"
-  volumeMountName: data
   discovery:
     zen:
       hostsProvider: srv

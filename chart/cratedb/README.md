@@ -102,21 +102,20 @@ $ kubectl delete statefulsets --cascade=false my-crate
 
 The following table lists main configurable most common parameters of the CrateDB chart and their default values:
 
-| Parameter                       | Description                                                                          | Default         |
-| ------------------------------- | ------------------------------------------------------------------------------------ | --------------- |
-| `replicas`                      | The initial number of nodes in the CrateDB cluster                                   | 3               |
-| `clusterName`                   | name given for the new CrateDB cluster                                               | cratedb-cluster |
-| `namespace`                     | namespace that you want to install crateDB                                           | default         |
-| `cratadbStatefulsetName`        | Name for the CrateDB statefulset                                                     | crate-set       |
-| `heapSize`                      | Size of the heap that your want to set for the CrateDB (megabytes)                   | 1G              |
-| `resources`                     | resources requests/limits can be defined as your requirement                         | {}              |
-| `persistentVolume.enabled`      | enable persistent volumes ( this must be true if your are running in production      | false           |
-| `persistentVolume.accessModes`  | access mode                                                                          | ReadWriteOnce   |
-| `persistentVolume.size`         | disk size ( production environment you have to specify according to your requirement | 10Gi            |
-| `cratedbConfig.dataPath`        | CrateDB configuration, data path                                                     | /data           |
-| `cratedbConfig.volumeMountName` | mount volume name                                                                    | data            |
-| `nameOverride`                  | override chart name                                                                  | ""              |
-| `fullnameOverride`              | override chart full name                                                             | ""              |
+| Parameter                      | Description                                                                          | Default         |
+| ------------------------------ | ------------------------------------------------------------------------------------ | --------------- |
+| `replicas`                     | The initial number of nodes in the CrateDB cluster                                   | 3               |
+| `clusterName`                  | name given for the new CrateDB cluster                                               | cratedb-cluster |
+| `namespace`                    | namespace that you want to install crateDB                                           | default         |
+| `cratadbStatefulsetName`       | Name for the CrateDB statefulset                                                     | crate-set       |
+| `heapSize`                     | Size of the heap that your want to set for the CrateDB (megabytes)                   | 1G              |
+| `resources`                    | resources requests/limits can be defined as your requirement                         | {}              |
+| `persistentVolume.enabled`     | enable persistent volumes ( this must be true if your are running in production      | false           |
+| `persistentVolume.accessModes` | access mode                                                                          | ReadWriteOnce   |
+| `persistentVolume.size`        | disk size ( production environment you have to specify according to your requirement | 10Gi            |
+| `cratedbConfig.dataPath`       | CrateDB configuration, data path                                                     | /data           |
+| `nameOverride`                 | override chart name                                                                  | ""              |
+| `fullnameOverride`             | override chart full name                                                             | ""              |
 
 Following table contains other parameters are also configurable in chart, but most of the time you may don't need to modify
 

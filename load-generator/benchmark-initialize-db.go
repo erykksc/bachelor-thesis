@@ -4,27 +4,30 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
+	"sort"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
 )
 
-func mustInitializeDb(ctx context.Context, connString string, dbTarget DBTarget, pois []POI, districts []District, ddl string) {
+func mustInitializeDb(ctx context.Context, connString string, dbTarget DBTarget, pois []POI, districts []District, migrationsDir string) {
 	logger.Info("Initializing Database", "databaseType", dbTarget, "connString", connString, "poiCount", len(pois), "districtCount", len(districts))
 
 	// Choose Database specific insert methods
-	insertPoiToDb := insertPoiToCratedb
-	insertDistrictToDb := insertDistrictToCratedb
+	queuePoiInsert := queuePoiInsertToCratedb
+	queueDistrictInsert := queueDistrictInsertToCratedb
 	switch dbTarget {
 	case CrateDB:
 		logger.Info("Initializing CrateDB")
-		insertPoiToDb = insertPoiToCratedb
-		insertDistrictToDb = insertDistrictToCratedb
+		queuePoiInsert = queuePoiInsertToCratedb
+		queueDistrictInsert = queueDistrictInsertToCratedb
 
 	case MobilityDB:
 		logger.Info("Initializing MobilityDB")
-		insertPoiToDb = insertPoiToMobilitydb
-		insertDistrictToDb = insertDistrictToMobilitydb
+		queuePoiInsert = queuePoiInsertToMobilitydb
+		queueDistrictInsert = queueDistrictInsertToMobilitydb
 	}
 
 	// Initialize database connection
@@ -34,93 +37,109 @@ func mustInitializeDb(ctx context.Context, connString string, dbTarget DBTarget,
 		os.Exit(1)
 	}
 	defer conn.Close(ctx)
+	logger.Info("Connected to database", "db", dbTarget)
 
-	// Initialize tables
-	res, err := conn.Exec(ctx, ddl)
+	// Run migrations
+	// Get all migration files sorted by name
+	migrationFiles, err := filepath.Glob(filepath.Join(migrationsDir, "*.sql"))
 	if err != nil {
-		logger.Error("Error while executing DDL", "database", dbTarget, "result", res, "error", err)
+		logger.Error("Error reading migration files", "error", err)
 		os.Exit(1)
 	}
-	logger.Info("Inserted Tables successfully", "res", res)
+	sort.Strings(migrationFiles)
+
+	// Execute each migration file
+	for _, migrationFile := range migrationFiles {
+		logger.Info("Running migration", "file", migrationFile)
+		migrationSQL, err := os.ReadFile(migrationFile)
+		if err != nil {
+			logger.Error("Error reading migration file", "file", migrationFile, "error", err)
+			os.Exit(1)
+		}
+
+		statements := strings.SplitSeq(string(migrationSQL), ";")
+		for stmt := range statements {
+			stmt = strings.TrimSpace(stmt)
+			if stmt == "" {
+				continue
+			}
+			if _, err := conn.Exec(ctx, stmt); err != nil {
+				logger.Error("Error executing migration", "file", migrationFile, "error", err)
+				os.Exit(1)
+			}
+		}
+		logger.Info("Migration completed successfully", "file", migrationFile)
+	}
 
 	// Insert POIs
 	startTime := time.Now()
+	pgxBatch := &pgx.Batch{}
 	for _, poi := range pois {
-		err := insertPoiToDb(ctx, conn, &poi)
+		queuePoiInsert(pgxBatch, &poi)
+	}
+	batchResults := conn.SendBatch(ctx, pgxBatch)
+	defer batchResults.Close()
+	for _, poi := range pois {
+		_, err := batchResults.Exec()
 		if err != nil {
 			logger.Error("Error executing poi insert query", "error", err, "poiData", poi)
 			os.Exit(1)
 		}
-		logger.Info("Inserted POI", "poi", poi)
 	}
+	batchResults.Close()
 	logger.Info("Inserted all POIs into database", "dbTarget", dbTarget, "poiCount", len(pois), "timeElapsedInSec", time.Since(startTime).Seconds())
 
 	// Insert districts
 	startTime = time.Now()
+	pgxBatch = &pgx.Batch{}
 	for _, district := range districts {
-		err := insertDistrictToDb(ctx, conn, &district)
+		queueDistrictInsert(pgxBatch, &district)
+	}
+	batchResults = conn.SendBatch(ctx, pgxBatch)
+	defer batchResults.Close()
+	for _, district := range districts {
+		_, err := batchResults.Exec()
 		if err != nil {
 			logger.Error("Error executing district insert query", "error", err, "districtData", district.String())
 			os.Exit(1)
 		}
-		logger.Info("Inserted District", "district", district.String())
 	}
-	logger.Info("Inserted all districts into database", "dbTarget", dbTarget, "districtCount", len(pois), "timeElapsedInSec", time.Since(startTime).Seconds())
+	batchResults.Close()
+	logger.Info("Inserted all districts into database", "dbTarget", dbTarget, "districtCount", len(districts), "timeElapsedInSec", time.Since(startTime).Seconds())
 }
 
-func insertPoiToCratedb(ctx context.Context, conn *pgx.Conn, poi *POI) error {
+func queuePoiInsertToCratedb(batch *pgx.Batch, poi *POI) *pgx.QueuedQuery {
 	// string interpolation is done instead of passing arguments to conn.Exec
 	// as I want to avoid istalling additional library to support GEO_POINT types
-	query := fmt.Sprintf(`INSERT INTO pois(
-				poi_id,
-				name,
-				category,
-				geo_point
-			) VALUES (
-				'%s', '%s', '%s', [%s, %s]
-			);`, poi.POIID, poi.Name, poi.Category, poi.Latitude, poi.Longitude)
-	_, err := conn.Exec(ctx, query)
-	return err
+	query := fmt.Sprintf(
+		`INSERT INTO pois( poi_id, name, category, geo_point)
+		VALUES ( '%s', '%s', '%s', [%s, %s]);`,
+		poi.POIID, poi.Name, poi.Category, poi.Latitude, poi.Longitude)
+	logger.Debug("queuing POI insert", "sql", query, "poi", poi)
+	return batch.Queue(query)
 }
 
-func insertPoiToMobilitydb(ctx context.Context, conn *pgx.Conn, poi *POI) error {
-	query := fmt.Sprintf(`INSERT INTO pois (
-		poi_id,
-		name,
-		category,
-		geom
+func queuePoiInsertToMobilitydb(batch *pgx.Batch, poi *POI) *pgx.QueuedQuery {
+	query := fmt.Sprintf(
+		`INSERT INTO pois ( poi_id, name, category, geom)
+		VALUES ( '%s', '%s', '%s', ST_SetSRID(ST_MakePoint(%s, %s), 4326));`,
+		poi.POIID, poi.Name, poi.Category, poi.Longitude, poi.Latitude)
+
+	logger.Debug("queuing POI insert", "sql", query, "poi", poi)
+	return batch.Queue(query)
+}
+
+func queueDistrictInsertToCratedb(batch *pgx.Batch, district *District) *pgx.QueuedQuery {
+	return batch.Queue(
+		`INSERT INTO districts( district_id, name, geo_shape)
+		VALUES ( $1, $2, $3);`,
+		district.DistrictID, district.Name, district.Geometry,
 	)
-	VALUES (
-		%s,
-		'%s',
-		'%s',
-		ST_SetSRID(ST_MakePoint(%s, %s), 4326)
-	);`, poi.POIID, poi.Name, poi.Category, poi.Longitude, poi.Latitude)
-	_, err := conn.Exec(ctx, query)
-	return err
 }
 
-func insertDistrictToCratedb(ctx context.Context, conn *pgx.Conn, district *District) error {
-	query := `INSERT INTO districts( district_id, name, geo_shape)
-				VALUES ( $1, $2, $3);`
-
-	_, err := conn.Exec(ctx, query, district.DistrictID, district.Name, district.Geometry)
-	return err
-}
-
-func insertDistrictToMobilitydb(ctx context.Context, conn *pgx.Conn, district *District) error {
-	query := `
-		INSERT INTO districts (
-			district_id,
-			name,
-			geom
-		)
-		VALUES (
-			$1,
-			$2,
-			ST_GeomFromGeoJSON($3)
-		);`
-
-	_, err := conn.Exec(ctx, query, district.DistrictID, district.Name, district.Geometry)
-	return err
+func queueDistrictInsertToMobilitydb(batch *pgx.Batch, district *District) *pgx.QueuedQuery {
+	return batch.Queue(
+		`INSERT INTO districts ( district_id, name, geom)
+		VALUES ( $1, $2, ST_GeomFromGeoJSON($3));`,
+		district.DistrictID, district.Name, district.Geometry)
 }

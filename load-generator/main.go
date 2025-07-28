@@ -72,20 +72,20 @@ func main() {
 	defer stop()
 	// CLI flags
 	var (
-		dbTargetStr        = flag.String("dbTarget", "cratedb", "Target database: cratedb or mobilitydb")
-		connString         = flag.String("db", "postgresql://crate:crate@localhost:5432/doc", "Connection string to use to connect to db")
-		districtsPath      = flag.String("districts", "../dataset-generator/output/berlin-districts.geojson", "Path to a file containing districts")
-		poisPath           = flag.String("pois", "../dataset-generator/output/berlin-pois.csv", "Path to a file containing POIs")
-		tripsPath          = flag.String("trips", "../dataset-generator/output/escooter-trips-small.csv", "Path to a CSV file containing the escooter trip events")
-		ddlPath            = flag.String("ddl", "./schemas/cratedb-ddl.sql", "File containing the DDL for creating database tables")
-		mode               = flag.String("mode", "insert", "Mode: insert, query, init")
-		numWorkers         = flag.Int("nworkers", 24, "Number of simultanious workers for the benchmark to use")
-		skipInitialization = flag.Bool("skip-init", false, "[Only valid in insert mode] Skip database initialization (creating tables, inserting POIs, and districts)")
-		logDebug           = flag.Bool("log-debug", false, "Turn on the DEBUG level for logging")
-		numQueries         = flag.Int("nqueries", 100, "Number of queries to execute")
-		randomSeed         = flag.Int64("seed", 42, "Random seed for deterministic query generation")
-		templatesFilepath  = flag.String("qtemplates", "./schemas/cratedb-simple-read-queries.tmpl", "Path to a file containing query templates")
-		tripEventsCSV      = flag.String("tevents", "../dataset-generator/output/escooter-trips-small.csv", "Path to a CSV file containing trip events")
+		dbTargetStr       = flag.String("dbTarget", "cratedb", "Target database: cratedb or mobilitydbc")
+		connString        = flag.String("db", "postgresql://crate:crate@localhost:5432/doc", "Connection string to use to connect to db")
+		districtsPath     = flag.String("districts", "../dataset-generator/output/berlin-districts.geojson", "Path to a file containing districts")
+		poisPath          = flag.String("pois", "../dataset-generator/output/berlin-pois.csv", "Path to a file containing POIs")
+		tripsPath         = flag.String("trips", "../dataset-generator/output/escooter-trips-small.csv", "Path to a CSV file containing the escooter trip events")
+		migrationsDir     = flag.String("migrations", "./migrations", "Directory containing migration files")
+		mode              = flag.String("mode", "insert", "Mode: insert, query, init")
+		numWorkers        = flag.Int("nworkers", 24, "Number of simultanious workers for the benchmark to use")
+		batchSize         = flag.Int("batch-size", 1000, "Number of trip events to insert per request")
+		logDebug          = flag.Bool("log-debug", false, "Turn on the DEBUG level for logging")
+		numQueries        = flag.Int("nqueries", 100, "Number of queries to execute")
+		randomSeed        = flag.Int64("seed", 42, "Random seed for deterministic query generation")
+		templatesFilepath = flag.String("qtemplates", "./schemas/cratedb-simple-read-queries.tmpl", "Path to a file containing query templates")
+		tripEventsCSV     = flag.String("tevents", "../dataset-generator/output/escooter-trips-small.csv", "Path to a CSV file containing trip events")
 	)
 	flag.Parse()
 
@@ -104,10 +104,9 @@ func main() {
 		"districts", districtsPath,
 		"pois", poisPath,
 		"trips", tripsPath,
-		"ddl", ddlPath,
+		"migrations", migrationsDir,
 		"mode", mode,
 		"nworkers", numWorkers,
-		"skip-init", skipInitialization,
 		"log-debug", logDebug,
 		"queries-per-worker", numQueries,
 		"seed", randomSeed,
@@ -119,7 +118,7 @@ func main() {
 	switch *dbTargetStr {
 	case "cratedb":
 		dbTarget = CrateDB
-	case "mobilitydb":
+	case "mobilitydbc":
 		dbTarget = MobilityDB
 	default:
 		logger.Error("Invalid CLI argument", "argument", "dbTarget", "value", *dbTargetStr, "expected", "cratedb|mobilitydb")
@@ -135,16 +134,10 @@ func main() {
 	switch *mode {
 	case "init":
 		// initialize tables and insert POIs and Districts
-		ddlB, err := os.ReadFile(*ddlPath)
-		if err != nil {
-			logger.Error("Error reading DDL file", "error", err)
-			os.Exit(1)
-		}
-		ddl := string(ddlB)
-		mustInitializeDb(ctx, *connString, dbTarget, pois, districts, ddl)
+		mustInitializeDb(ctx, *connString, dbTarget, pois, districts, *migrationsDir)
 
 	case "insert":
-		benchmarkInserts(ctx, *connString, *numWorkers, dbTarget, *tripsPath)
+		benchmarkInserts(ctx, *connString, *numWorkers, *batchSize, dbTarget, *tripsPath)
 
 	case "query":
 		queryTemplates := mustLoadTemplates(*templatesFilepath)

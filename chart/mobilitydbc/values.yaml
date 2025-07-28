@@ -1,0 +1,63 @@
+# Persistent volume configuration for both coordinator and worker
+persistentVolume:
+  storageClassName: "mobilitydb-premium"
+
+coordinator:
+  persistentVolume:
+    storageClassName: "mobilitydb-premium"
+    accessModes:
+      - ReadWriteOnce
+    size: 100Gi
+
+manager:
+  affinity:
+    podAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - labelSelector:
+            matchExpressions:
+              - key: component
+                operator: In
+                values: ["coordinator"]
+          topologyKey: kubernetes.io/hostname
+
+worker:
+  replicas: 1
+  resources: {}
+  persistentVolume:
+    storageClassName: "mobilitydb-premium"
+    accessModes:
+      - ReadWriteOnce
+    size: 100Gi
+  # Anti-affinity to ensure each worker runs on separate node
+  # affinity:
+  #   podAntiAffinity:
+  #     requiredDuringSchedulingIgnoredDuringExecution:
+  #       - labelSelector:
+  #           matchExpressions:
+  #             - key: component
+  #               operator: In
+  #               values: ["manager", "coordinator", "worker"]
+  #         topologyKey: kubernetes.io/hostname
+
+postgres:
+  user: postgres
+  password: postgres
+  database: postgres
+
+# Internal service configuration
+service:
+  type: ClusterIP
+  port: 5432
+
+# External service for load generator access
+externalService:
+  enabled: true
+  type: LoadBalancer
+  name: mobilitydb-external-service
+  port: 5432
+  portName: postgres
+
+ingress:
+  enabled: false
+  hosts: []
+  tls: false

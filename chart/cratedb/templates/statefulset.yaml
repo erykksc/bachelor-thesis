@@ -9,6 +9,8 @@ metadata:
 spec:
   serviceName: {{ .Values.cratadbStatefulsetName }}
   replicas: {{ .Values.replicas }}
+  persistentVolumeClaimRetentionPolicy:
+    whenDeleted: Delete
   selector:
     matchLabels:
   {{- include "cratedb.selectorLabels" . | nindent 6 }}
@@ -29,11 +31,6 @@ spec:
       serviceAccountName: {{ include "cratedb.serviceAccountName" . }}
       securityContext:
       {{- toYaml .Values.podSecurityContext | nindent 8 }}
-      {{- if not .Values.persistentVolume.enabled }}
-      volumes:
-        - name: {{ .Values.cratedbConfig.volumeMountName }}
-          emptyDir: {}
-      {{- end }}
       {{- if .Values.affinity }}
       affinity:
       {{ tpl .Values.affinity | indent 8 }}
@@ -101,7 +98,7 @@ spec:
                   fieldPath: metadata.namespace
           volumeMounts:
             - mountPath: {{ .Values.cratedbConfig.dataPath }}
-              name: {{ .Values.cratedbConfig.volumeMountName }}
+              name: cratedb-data-volume
       {{- with .Values.nodeSelector }}
       nodeSelector:
       {{- toYaml . | nindent 8 }}
@@ -114,23 +111,15 @@ spec:
       tolerations:
       {{- toYaml . | nindent 8 }}
       {{- end }}
-  {{- if .Values.persistentVolume.enabled }}
   volumeClaimTemplates:
     - metadata:
-        name: {{ .Values.cratedbConfig.volumeMountName }}
+        name: cratedb-data-volume
       spec:
-        {{- if .Values.persistentVolume.storageClass }}
-        {{- if (eq "-" .Values.persistentVolume.storageClass) }}
-        storageClassName: ""
-        {{- else }}
-        storageClassName: {{ .Values.persistentVolume.storageClass }}
-        {{- end }}
-        {{- end }}
+        storageClassName: {{ .Values.persistentVolume.storageClassName }}
         accessModes:
           {{- range .Values.persistentVolume.accessModes }}
           - {{ . | quote }}
-        {{- end }}
+          {{- end }}
         resources:
           requests:
             storage: {{ .Values.persistentVolume.size | quote }}
-  {{- end -}}

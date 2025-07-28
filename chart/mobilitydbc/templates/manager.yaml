@@ -4,7 +4,7 @@
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: {{ include "mobilitydbc-cluster.fullname" . }}-manager-sa
+  name: mobilitydbc-manager-sa
   labels:
     {{- include "mobilitydbc-cluster.labels" . | nindent 4 }}
     component: manager
@@ -12,7 +12,7 @@ metadata:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: {{ include "mobilitydbc-cluster.fullname" . }}-manager-role
+  name: mobilitydbc-manager-role
   labels:
     {{- include "mobilitydbc-cluster.labels" . | nindent 4 }}
     component: manager
@@ -24,25 +24,25 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: {{ include "mobilitydbc-cluster.fullname" . }}-manager-binding
+  name: mobilitydbc-manager-binding
   labels:
     {{- include "mobilitydbc-cluster.labels" . | nindent 4 }}
     component: manager
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: {{ include "mobilitydbc-cluster.fullname" . }}-manager-role
+  name: mobilitydbc-manager-role
 subjects:
   - kind: ServiceAccount
-    name: {{ include "mobilitydbc-cluster.fullname" . }}-manager-sa
+    name: mobilitydbc-manager-sa
 ---
 # ---------------------------
 # Manager Deployment
 # ---------------------------
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
-  name: {{ include "mobilitydbc-cluster.fullname" . }}-manager
+  name: mobilitydbc-manager
   labels:
     {{- include "mobilitydbc-cluster.labels" . | nindent 4 }}
     component: manager
@@ -58,14 +58,14 @@ spec:
         {{- include "mobilitydbc-cluster.selectorLabels" . | nindent 8 }}
         component: manager
     spec:
-      serviceAccountName: {{ include "mobilitydbc-cluster.fullname" . }}-manager-sa
+      serviceAccountName: mobilitydbc-manager-sa
       containers:
         - name: manager
           image: "ghcr.io/erykksc/citus-k8s-manager:latest"
           imagePullPolicy: Always 
           env:
             - name: CITUS_HOST
-              value: {{ include "mobilitydbc-cluster.fullname" . }}-coordinator
+              value: mobilitydbc-coordinator-service
             - name: POSTGRES_PASSWORD
               value: {{ .Values.postgres.password | quote }}
             - name: POSTGRES_USER

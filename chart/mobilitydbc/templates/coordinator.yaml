@@ -1,49 +1,50 @@
 # ---------------------------
-# Worker Headless Service
+# Coordinator Service
 # ---------------------------
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "mobilitydbc-cluster.fullname" . }}-worker
+  name: mobilitydbc-coordinator-service
   labels:
     {{- include "mobilitydbc-cluster.labels" . | nindent 4 }}
-    component: worker
+    component: coordinator
 spec:
-  clusterIP: None
-  selector:
-    {{- include "mobilitydbc-cluster.selectorLabels" . | nindent 4 }}
-    component: worker
   ports:
     - port: {{ .Values.service.port }}
       targetPort: 5432
       protocol: TCP
       name: postgres
+  selector:
+    {{- include "mobilitydbc-cluster.selectorLabels" . | nindent 4 }}
+    component: coordinator
 ---
 # ---------------------------
-# Worker StatefulSet
+# Coordinator StatefulSet
 # ---------------------------
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: {{ include "mobilitydbc-cluster.fullname" . }}-worker
+  name: mobilitydbc-coordinator
   labels:
     {{- include "mobilitydbc-cluster.labels" . | nindent 4 }}
-    component: worker
+    component: coordinator
 spec:
-  serviceName: {{ include "mobilitydbc-cluster.fullname" . }}-worker
-  replicas: {{ .Values.worker.replicas }}
+  serviceName: mobilitydbc-coordinator
+  replicas: 1
+  persistentVolumeClaimRetentionPolicy:
+    whenDeleted: Delete
   selector:
     matchLabels:
       {{- include "mobilitydbc-cluster.selectorLabels" . | nindent 6 }}
-      component: worker
+      component: coordinator
   template:
     metadata:
       labels:
         {{- include "mobilitydbc-cluster.selectorLabels" . | nindent 8 }}
-        component: worker
+        component: coordinator
     spec:
       containers:
-        - name: worker
+        - name: coordinator
           image: "ghcr.io/erykksc/citus-mobilitydb:latest"
           imagePullPolicy: Always 
           env:
@@ -54,15 +55,15 @@ spec:
             - name: POSTGRES_DB
               value: {{ .Values.postgres.database | quote }}
             - name: CITUS_ROLE
-              value: worker
+              value: coordinator
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
           ports:
             - containerPort: 5432
               protocol: TCP
-          {{- with .Values.worker.resources }}
-          resources:
-            {{- toYaml . | nindent 12 }}
-          {{- end }}
-      {{- with .Values.worker.affinity }}
-      affinity:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
+          volumeMounts:
+            - name: postgresql-data
+              mountPath: /var/lib/postgresql/data
+      volumes:
+        - name: postgresql-data
+          emptyDir: {}
