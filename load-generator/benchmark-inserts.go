@@ -14,7 +14,7 @@ import (
 )
 
 func benchmarkInserts(ctx context.Context, connString string, numWorkers int, batchSize int, useBulkInsert bool, dbTarget DBTarget, tripsFilename string) {
-	logger.Info("Starting Insert Benchmark", "dbConnString", connString, "numWorkers", numWorkers, "dbTarget", dbTarget, "tripsFilename", tripsFilename)
+	logger.Info("Starting Insert Benchmark", "dbConnString", connString, "numWorkers", numWorkers, "dbTarget", dbTarget.String(), "tripsFilename", tripsFilename)
 	// create specified number of workers
 	var wg sync.WaitGroup
 	jobs := make(chan []TripEvent, numWorkers*5) // batches of events
@@ -231,91 +231,70 @@ func insertEventMobilitydbSql(tEvent TripEvent) string {
 }
 
 func bulkInsertEventCratedbSql(events []TripEvent) string {
-	var eventIds strings.Builder
-	var tripIds strings.Builder
-	var timestamps strings.Builder
-	var locations strings.Builder
+	eventIds := make([]string, len(events))
+	tripIds := make([]string, len(events))
+	timestamps := make([]string, len(events))
+	locations := make([]string, len(events))
 	for i, tEvent := range events {
-		if i != 0 {
-			const prefix = ','
-			eventIds.WriteRune(prefix)
-			tripIds.WriteRune(prefix)
-			timestamps.WriteRune(prefix)
-			locations.WriteRune(prefix)
-		}
-
-		eventIds.WriteRune('\'')
-		eventIds.WriteString(tEvent.EventID)
-		eventIds.WriteRune('\'')
-
-		tripIds.WriteRune('\'')
-		tripIds.WriteString(tEvent.TripID)
-		tripIds.WriteRune('\'')
-
-		timestamps.WriteRune('\'')
-		timestamps.WriteString(tEvent.Timestamp)
-		timestamps.WriteRune('\'')
-
-		locations.WriteRune('\'')
-		locations.WriteString(fmt.Sprintf("POINT( %s %s )", tEvent.Longitude, tEvent.Latitude))
-		locations.WriteRune('\'')
+		eventIds[i] = tEvent.EventID
+		tripIds[i] = tEvent.TripID
+		timestamps[i] = tEvent.Timestamp
+		locations[i] = fmt.Sprintf("POINT( %s %s )", tEvent.Longitude, tEvent.Latitude)
 	}
 
 	return fmt.Sprintf(`
 	INSERT INTO escooter_events (
-		event_id, trip_id, timestamp, geo_point
+		event_id,
+		trip_id,
+		timestamp,
+		geo_point
 	)
 	(SELECT *
 		FROM  UNNEST(
-			[%s], [%s], [%s], [%s]
+		[%s],
+		[%s],
+		[%s],
+		[%s]
 		)
-	);`, eventIds.String(), tripIds.String(), timestamps.String(), locations.String())
+	);`,
+		joinAndQuoteStrings(eventIds),
+		joinAndQuoteStrings(tripIds),
+		joinAndQuoteStrings(timestamps),
+		joinAndQuoteStrings(locations),
+	)
 }
 
 func bulkInsertEventMobilitydbSql(events []TripEvent) string {
-	var eventIds strings.Builder
-	var tripIds strings.Builder
-	var timestamps strings.Builder
-	var locations strings.Builder
+	eventIds := make([]string, len(events))
+	tripIds := make([]string, len(events))
+	timestamps := make([]string, len(events))
+	locations := make([]string, len(events))
 	for i, tEvent := range events {
-		if i != 0 {
-			const prefix = ','
-			eventIds.WriteRune(prefix)
-			tripIds.WriteRune(prefix)
-			timestamps.WriteRune(prefix)
-			locations.WriteRune(prefix)
-		}
-
-		eventIds.WriteRune('\'')
-		eventIds.WriteString(tEvent.EventID)
-		eventIds.WriteRune('\'')
-
-		tripIds.WriteRune('\'')
-		tripIds.WriteString(tEvent.TripID)
-		tripIds.WriteRune('\'')
-
-		timestamps.WriteRune('\'')
-		timestamps.WriteString(tEvent.Timestamp)
-		timestamps.WriteRune('\'')
-
-		locations.WriteString(fmt.Sprintf(
-			"tgeompoint 'Point(%s %s)@%s'", tEvent.Longitude, tEvent.Latitude, tEvent.Timestamp),
-		)
+		eventIds[i] = tEvent.EventID
+		tripIds[i] = tEvent.TripID
+		timestamps[i] = tEvent.Timestamp
+		locations[i] = fmt.Sprintf(
+			"tgeompoint 'Point(%s %s)@%s'", tEvent.Longitude, tEvent.Latitude, tEvent.Timestamp)
 	}
 
 	return fmt.Sprintf(`
-	INSERT INTO escooter_events (
+		INSERT INTO escooter_events (
 		event_id, 
 		trip_id,
 		timestamp,
 		location
-	)
-	(SELECT *
+		)
+		(SELECT *
 		FROM  UNNEST(
 		ARRAY[%s]::UUID[],
 		ARRAY[%s]::UUID[],
 		ARRAY[%s]::TIMESTAMP[],
 		ARRAY[%s]::tgeompoint[]
 		)
-	);`, eventIds.String(), tripIds.String(), timestamps.String(), locations.String())
+		);`,
+		joinAndQuoteStrings(eventIds),
+		joinAndQuoteStrings(tripIds),
+		joinAndQuoteStrings(timestamps),
+		strings.Join(locations, ","),
+	)
 }

@@ -21,7 +21,7 @@ func benchmarkQueries(ctx context.Context, connString string, numWorkers int, db
 	logger.Info("Starting Query Benchmark",
 		"dbConnString", connString,
 		"numWorkers", numWorkers,
-		"dbTarget", dbTarget,
+		"dbTarget", dbTarget.String(),
 		"queriesNum", numQueries,
 		"seed", seed,
 	)
@@ -133,11 +133,7 @@ func ReadTripIds(ctx context.Context, tripEventsCSV string) []string {
 
 	tripEventIds := make([]string, 0)
 	lastTripId := "" // used to pass only unique values
-	for {
-		if ctx.Err() != nil {
-			break
-		}
-
+	for ctx.Err() != nil {
 		rec, err := r.Read()
 		if err == io.EOF {
 			break
