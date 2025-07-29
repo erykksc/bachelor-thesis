@@ -226,7 +226,7 @@ func mustLoadTemplates(templatesFilepath string) *template.Template {
 			continue
 		}
 		// Re-parse the content of each template into the new set
-		_, err := queryTemplates.New(tmpl.Name()).Parse(tmpl.Tree.Root.String())
+		_, err := queryTemplates.New(tmpl.Name()).Parse(tmpl.Root.String())
 		if err != nil {
 			logger.Error("Error parising a template")
 		}

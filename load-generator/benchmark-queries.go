@@ -91,7 +91,7 @@ func ValidateTemplates(ctx context.Context, templates *template.Template, connSt
 		templateNames[i] = tmpl.Name()
 	}
 
-	logger.Info("Validating the templates by running all the query types on database", "templateNames", templateNames)
+	logger.Info("Validating the templates by running all the query types on database", "templateNames", templateNames, "generator", *generator)
 
 	fields := generator.GenerateFields(0)
 
@@ -133,7 +133,7 @@ func ReadTripIds(ctx context.Context, tripEventsCSV string) []string {
 
 	tripEventIds := make([]string, 0)
 	lastTripId := "" // used to pass only unique values
-	for ctx.Err() != nil {
+	for ctx.Err() == nil {
 		rec, err := r.Read()
 		if err == io.EOF {
 			break
@@ -149,6 +149,7 @@ func ReadTripIds(ctx context.Context, tripEventsCSV string) []string {
 			lastTripId = tripId
 		}
 	}
+	logger.Debug("Read trip events ids from CSV file", "file", tripEventsCSV, "tripEventsCount", len(tripEventIds))
 	return tripEventIds
 }
 
