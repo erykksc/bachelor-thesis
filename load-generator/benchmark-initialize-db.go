@@ -141,12 +141,12 @@ func insertPoisToMobilitydb(ctx context.Context, conn *pgx.Conn, pois []POI) err
 	poiIds := make([]string, len(pois))
 	names := make([]string, len(pois))
 	categories := make([]string, len(pois))
-	geoms := make([]string, len(pois))
+	geo_points := make([]string, len(pois))
 	for i, poi := range pois {
 		poiIds[i] = poi.POIID
 		names[i] = poi.Name
 		categories[i] = poi.Category
-		geoms[i] = fmt.Sprintf("ST_SetSRID(ST_MakePoint(%s, %s), 4326)", poi.Longitude, poi.Latitude)
+		geo_points[i] = fmt.Sprintf("ST_SetSRID(ST_MakePoint(%s, %s), 4326)", poi.Longitude, poi.Latitude)
 	}
 
 	query := fmt.Sprintf(`
@@ -154,7 +154,7 @@ func insertPoisToMobilitydb(ctx context.Context, conn *pgx.Conn, pois []POI) err
 		poi_id,
 		name,
 		category,
-		geom
+		geo_point
 	)
 	(SELECT *
 		FROM  UNNEST(
@@ -167,7 +167,7 @@ func insertPoisToMobilitydb(ctx context.Context, conn *pgx.Conn, pois []POI) err
 		joinAndQuoteStrings(poiIds),
 		joinAndQuoteStrings(names),
 		joinAndQuoteStrings(categories),
-		strings.Join(geoms, ","),
+		strings.Join(geo_points, ","),
 	)
 
 	_, err := conn.Exec(ctx, query)
@@ -184,7 +184,7 @@ func queueDistrictInsertToCratedb(batch *pgx.Batch, district *District) *pgx.Que
 
 func queueDistrictInsertToMobilitydb(batch *pgx.Batch, district *District) *pgx.QueuedQuery {
 	return batch.Queue(
-		`INSERT INTO districts ( district_id, name, geom)
+		`INSERT INTO districts ( district_id, name, geo_shape)
 		VALUES ( $1, $2, ST_GeomFromGeoJSON($3));`,
 		district.DistrictID, district.Name, district.Geometry)
 }

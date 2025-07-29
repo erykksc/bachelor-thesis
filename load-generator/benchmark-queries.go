@@ -68,11 +68,13 @@ func benchmarkQueries(ctx context.Context, connString string, numWorkers int, db
 	}
 	close(jobs)
 	wg.Wait()
-
+	endTime := time.Now()
 	if ctx.Err() == nil {
 		logger.Info("All query workers finished",
 			"totalQueries", numQueries,
-			"timeElapsedInSec", time.Since(startTime).Seconds(),
+			"timeElapsedInSec", endTime.Sub(startTime).Seconds(),
+			"startTime", startTime,
+			"endTime", endTime,
 		)
 	}
 }

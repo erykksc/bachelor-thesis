@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"strings"
 	"sync"
 	"time"
 
@@ -93,8 +92,9 @@ csvScanLoop:
 
 	close(jobs)
 	wg.Wait()
+	endTime := time.Now()
 	if ctx.Err() == nil {
-		logger.Info("All escooter trip events added", "count", tripEventsCount, "timeElapsedInSec", time.Since(startTime).Seconds())
+		logger.Info("All escooter trip events added", "count", tripEventsCount, "timeElapsedInSec", endTime.Sub(startTime).Seconds(), "startTime", startTime, "endTime", endTime)
 	}
 
 }
@@ -223,10 +223,10 @@ func insertEventCratedbSql(tEvent TripEvent) string {
 func insertEventMobilitydbSql(tEvent TripEvent) string {
 	return fmt.Sprintf(`
 	INSERT INTO escooter_events (
-		event_id, trip_id, timestamp, location
+		event_id, trip_id, timestamp, tpoint
 	)
 	VALUES (
-		'%s', '%s', '%s', tgeompoint 'Point(%s %s)@%s'
+		'%s', '%s', '%s', tgeogpoint 'SRID=4326;POINT(%s %s)@%s'
 	);`, tEvent.EventID, tEvent.TripID, tEvent.Timestamp, tEvent.Longitude, tEvent.Latitude, tEvent.Timestamp)
 }
 
@@ -234,12 +234,12 @@ func bulkInsertEventCratedbSql(events []TripEvent) string {
 	eventIds := make([]string, len(events))
 	tripIds := make([]string, len(events))
 	timestamps := make([]string, len(events))
-	locations := make([]string, len(events))
+	points := make([]string, len(events))
 	for i, tEvent := range events {
 		eventIds[i] = tEvent.EventID
 		tripIds[i] = tEvent.TripID
 		timestamps[i] = tEvent.Timestamp
-		locations[i] = fmt.Sprintf("POINT( %s %s )", tEvent.Longitude, tEvent.Latitude)
+		points[i] = fmt.Sprintf("POINT( %s %s )", tEvent.Longitude, tEvent.Latitude)
 	}
 
 	return fmt.Sprintf(`
@@ -260,7 +260,7 @@ func bulkInsertEventCratedbSql(events []TripEvent) string {
 		joinAndQuoteStrings(eventIds),
 		joinAndQuoteStrings(tripIds),
 		joinAndQuoteStrings(timestamps),
-		joinAndQuoteStrings(locations),
+		joinAndQuoteStrings(points),
 	)
 }
 
@@ -268,13 +268,12 @@ func bulkInsertEventMobilitydbSql(events []TripEvent) string {
 	eventIds := make([]string, len(events))
 	tripIds := make([]string, len(events))
 	timestamps := make([]string, len(events))
-	locations := make([]string, len(events))
+	tpoints := make([]string, len(events))
 	for i, tEvent := range events {
 		eventIds[i] = tEvent.EventID
 		tripIds[i] = tEvent.TripID
 		timestamps[i] = tEvent.Timestamp
-		locations[i] = fmt.Sprintf(
-			"tgeompoint 'Point(%s %s)@%s'", tEvent.Longitude, tEvent.Latitude, tEvent.Timestamp)
+		tpoints[i] = fmt.Sprintf("SRID=4326;POINT(%s %s)@%s", tEvent.Longitude, tEvent.Latitude, tEvent.Timestamp)
 	}
 
 	return fmt.Sprintf(`
@@ -282,19 +281,19 @@ func bulkInsertEventMobilitydbSql(events []TripEvent) string {
 		event_id, 
 		trip_id,
 		timestamp,
-		location
+		tgeo_point
 		)
 		(SELECT *
 		FROM  UNNEST(
 		ARRAY[%s]::UUID[],
 		ARRAY[%s]::UUID[],
 		ARRAY[%s]::TIMESTAMP[],
-		ARRAY[%s]::tgeompoint[]
+		ARRAY[%s]::tgeogpoint[]
 		)
 		);`,
 		joinAndQuoteStrings(eventIds),
 		joinAndQuoteStrings(tripIds),
 		joinAndQuoteStrings(timestamps),
-		strings.Join(locations, ","),
+		joinAndQuoteStrings(tpoints),
 	)
 }

@@ -72,21 +72,21 @@ func main() {
 	defer stop()
 	// CLI flags
 	var (
-		dbTargetStr       = flag.String("dbTarget", "cratedb", "Target database: cratedb or mobilitydbc")
-		connString        = flag.String("db", "postgresql://crate:crate@localhost:5432/doc", "Connection string to use to connect to db")
-		districtsPath     = flag.String("districts", "../dataset-generator/output/berlin-districts.geojson", "Path to a file containing districts")
-		poisPath          = flag.String("pois", "../dataset-generator/output/berlin-pois.csv", "Path to a file containing POIs")
-		tripsPath         = flag.String("trips", "../dataset-generator/output/escooter-trips-small.csv", "Path to a CSV file containing the escooter trip events")
-		migrationsDir     = flag.String("migrations", "./migrations", "Directory containing migration files")
-		mode              = flag.String("mode", "insert", "Mode: insert, query, init")
-		numWorkers        = flag.Int("nworkers", 24, "Number of simultanious workers for the benchmark to use")
-		batchSize         = flag.Int("batch-size", 1000, "Number of trip events to insert per sent request")
-		useBulkInsert     = flag.Bool("bulk-insert", false, "Insert rows using UNNEST, one query with many inserts")
-		logDebug          = flag.Bool("log-debug", false, "Turn on the DEBUG level for logging")
-		numQueries        = flag.Int("nqueries", 100, "Number of queries to execute")
-		randomSeed        = flag.Int64("seed", 42, "Random seed for deterministic query generation")
-		templatesFilepath = flag.String("qtemplates", "./schemas/cratedb-simple-read-queries.tmpl", "Path to a file containing query templates")
-		tripEventsCSV     = flag.String("tevents", "../dataset-generator/output/escooter-trips-small.csv", "Path to a CSV file containing trip events")
+		dbTargetStr     = flag.String("dbTarget", "cratedb", "Target database: cratedb or mobilitydbc")
+		connString      = flag.String("db", "postgresql://crate:crate@localhost:5432/doc", "Connection string to use to connect to db")
+		districtsPath   = flag.String("districts", "../dataset-generator/output/berlin-districts.geojson", "Path to a file containing districts")
+		poisPath        = flag.String("pois", "../dataset-generator/output/berlin-pois.csv", "Path to a file containing POIs")
+		tripsPath       = flag.String("trips", "../dataset-generator/output/escooter-trips-small.csv", "Path to a CSV file containing the escooter trip events")
+		migrationsDir   = flag.String("migrations", "./migrations", "Directory containing migration files")
+		mode            = flag.String("mode", "insert", "Mode: insert, query, init")
+		numWorkers      = flag.Int("nworkers", 24, "Number of simultanious workers for the benchmark to use")
+		batchSize       = flag.Int("batch-size", 1000, "Number of trip events to insert per sent request")
+		useBulkInsert   = flag.Bool("bulk-insert", false, "Insert rows using UNNEST, one query with many inserts")
+		logDebug        = flag.Bool("log-debug", false, "Turn on the DEBUG level for logging")
+		numQueries      = flag.Int("nqueries", 100, "Number of queries to execute")
+		randomSeed      = flag.Int64("seed", 42, "Random seed for deterministic query generation")
+		queriesFilepath = flag.String("queries", "./schemas/cratedb-simple-read-queries.tmpl", "Path to a file containing query templates")
+		tripEventsCSV   = flag.String("tevents", "../dataset-generator/output/escooter-trips-small.csv", "Path to a CSV file containing trip events")
 	)
 	flag.Parse()
 
@@ -111,7 +111,7 @@ func main() {
 		"log-debug", logDebug,
 		"queries-per-worker", numQueries,
 		"seed", randomSeed,
-		"qtemplates", templatesFilepath,
+		"qtemplates", queriesFilepath,
 		"tevents", tripEventsCSV,
 	)
 
@@ -141,7 +141,7 @@ func main() {
 		benchmarkInserts(ctx, *connString, *numWorkers, *batchSize, *useBulkInsert, dbTarget, *tripsPath)
 
 	case "query":
-		queryTemplates := mustLoadTemplates(*templatesFilepath)
+		queryTemplates := mustLoadTemplates(*queriesFilepath)
 
 		logger.Info("Loaded read queries templates", "count", len(queryTemplates.Templates()))
 		benchmarkQueries(ctx, *connString, *numWorkers, dbTarget, *tripEventsCSV, districts, pois, queryTemplates, *numQueries, *randomSeed)
