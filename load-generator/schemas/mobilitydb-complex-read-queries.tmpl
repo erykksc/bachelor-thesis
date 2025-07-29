@@ -4,6 +4,7 @@ WITH trip_bounds AS (
          MIN(timestamp) AS start_time,
          MAX(timestamp) AS end_time
   FROM escooter_events
+  WHERE timestamp BETWEEN '{{.StartTime}}' AND '{{.EndTime}}'
   GROUP BY trip_id
 ),
 start_end_events AS (
@@ -41,13 +42,16 @@ WITH trip_durations AS (
   SELECT trip_id,
          EXTRACT(EPOCH FROM MAX(timestamp) - MIN(timestamp)) AS duration_secs
   FROM escooter_events
+  WHERE timestamp BETWEEN '{{.StartTime}}' AND '{{.EndTime}}'
   GROUP BY trip_id
+  HAVING EXTRACT(EPOCH FROM MAX(timestamp) - MIN(timestamp)) > 60
 )
 SELECT d.name AS district,
        AVG(td.duration_secs) AS avg_duration_secs
 FROM trip_durations td
 JOIN escooter_events e ON e.trip_id = td.trip_id
 JOIN districts d ON ST_Within(e.geo_point::geometry, d.geo_shape::geometry)
+WHERE e.timestamp BETWEEN '{{.StartTime}}' AND '{{.EndTime}}'
 GROUP BY d.name
 ORDER BY avg_duration_secs DESC;
 {{end}}
@@ -68,6 +72,7 @@ WITH trip_bounds AS (
          MIN(timestamp) AS start_time,
          MAX(timestamp) AS end_time
   FROM escooter_events
+  WHERE timestamp BETWEEN '{{.StartTime}}' AND '{{.EndTime}}'
   GROUP BY trip_id
 ),
 start_end_events AS (

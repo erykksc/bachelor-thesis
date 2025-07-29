@@ -1,31 +1,31 @@
 {{define "TripLength"}}
-SELECT t.trip_id,
-       trajectory(t.*) <-> trajectory(t.*) AS trip_length_m
+SELECT SUM(ST_Distance(geo_point::geometry, next_geo::geometry)) AS trip_length_m
 FROM (
-    SELECT trip_id,
-           temporalinst(geo_point, timestamp) AS instants
-    FROM escooter_events
-    WHERE trip_id = '{{.TripID}}'
-    ORDER BY timestamp
-) AS t;
+  SELECT
+    geo_point,
+    LEAD(geo_point) OVER (ORDER BY timestamp) AS next_geo
+  FROM escooter_events
+  WHERE trip_id = '{{.TripID}}'
+) t
+WHERE next_geo IS NOT NULL;
 {{end}}
 
 {{define "EscooterTraceByTripID"}}
-SELECT temporalinst(geo_point, timestamp) AS trace
+SELECT *
 FROM escooter_events
 WHERE trip_id = '{{.TripID}}'
 ORDER BY timestamp;
 {{end}}
 
 {{define "LastKnownLocationPerTrip"}}
-SELECT trip_id, last_value(temporalinst(geo_point, timestamp)) AS last_location
+SELECT trip_id, geo_point, timestamp
 FROM (
-    SELECT trip_id,
-           temporalinst(geo_point, timestamp) AS inst
+    SELECT *,
+           ROW_NUMBER() OVER (PARTITION BY trip_id ORDER BY timestamp DESC) AS rn
     FROM escooter_events
-    ORDER BY timestamp
-) AS t
-GROUP BY trip_id;
+) t
+WHERE rn = 1
+LIMIT {{.Limit}};
 {{end}}
 
 {{define "EscootersInDistricsInTimeRange"}}
@@ -66,6 +66,15 @@ ORDER BY dist
 LIMIT 1;
 {{end}}
 
+
+{{define "EscootersNearPOI"}}
+SELECT DISTINCT e.trip_id
+FROM escooter_events e
+JOIN pois p
+  ON ST_Distance(e.geo_point::geometry, p.geo_point::geometry) < {{.Radius}}
+WHERE p.poi_id = '{{.POIID}}';
+{{end}}
+
 {{define "CountEventsInDistrictPerHour"}}
 SELECT date_trunc('hour', e.timestamp) AS hour,
        COUNT(*) AS event_count
@@ -77,17 +86,10 @@ GROUP BY hour
 ORDER BY hour;
 {{end}}
 
-{{define "EscootersNearPOI"}}
-SELECT DISTINCT e.trip_id
-FROM escooter_events e
-JOIN pois p
-  ON ST_Distance(e.geo_point::geometry, p.geo_point::geometry) < {{.Radius}}
-WHERE p.poi_id = '{{.POIID}}';
-{{end}}
-
-{{define "SpatiotemporalJoinPOI"}}
+{{define "EscootersWithPOIsInRadiusOfEachOther"}}
 SELECT e.*, p.*
 FROM escooter_events e
 JOIN pois p
-  ON ST_Distance(e.geo_point::geometry, p.geo_point::geometry) < {{.Radius}};
+  ON ST_Distance(e.geo_point::geometry, p.geo_point::geometry) < {{.Radius}}
+LIMIT {{.Limit}};
 {{end}}
