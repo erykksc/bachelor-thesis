@@ -80,7 +80,8 @@ func main() {
 		migrationsDir     = flag.String("migrations", "./migrations", "Directory containing migration files")
 		mode              = flag.String("mode", "insert", "Mode: insert, query, init")
 		numWorkers        = flag.Int("nworkers", 24, "Number of simultanious workers for the benchmark to use")
-		batchSize         = flag.Int("batch-size", 1000, "Number of trip events to insert per request")
+		batchSize         = flag.Int("batch-size", 1000, "Number of trip events to insert per sent request")
+		useBulkInsert     = flag.Bool("bulk-insert", false, "Insert rows using UNNEST, one query with many inserts")
 		logDebug          = flag.Bool("log-debug", false, "Turn on the DEBUG level for logging")
 		numQueries        = flag.Int("nqueries", 100, "Number of queries to execute")
 		randomSeed        = flag.Int64("seed", 42, "Random seed for deterministic query generation")
@@ -137,7 +138,7 @@ func main() {
 		mustInitializeDb(ctx, *connString, dbTarget, pois, districts, *migrationsDir)
 
 	case "insert":
-		benchmarkInserts(ctx, *connString, *numWorkers, *batchSize, dbTarget, *tripsPath)
+		benchmarkInserts(ctx, *connString, *numWorkers, *batchSize, *useBulkInsert, dbTarget, *tripsPath)
 
 	case "query":
 		queryTemplates := mustLoadTemplates(*templatesFilepath)

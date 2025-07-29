@@ -6,13 +6,14 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/jackc/pgx/v5"
 )
 
-func benchmarkInserts(ctx context.Context, connString string, numWorkers int, batchSize int, dbTarget DBTarget, tripsFilename string) {
+func benchmarkInserts(ctx context.Context, connString string, numWorkers int, batchSize int, useBulkInsert bool, dbTarget DBTarget, tripsFilename string) {
 	logger.Info("Starting Insert Benchmark", "dbConnString", connString, "numWorkers", numWorkers, "dbTarget", dbTarget, "tripsFilename", tripsFilename)
 	// create specified number of workers
 	var wg sync.WaitGroup
@@ -20,7 +21,7 @@ func benchmarkInserts(ctx context.Context, connString string, numWorkers int, ba
 	for i := 1; i <= numWorkers; i++ {
 		wg.Add(1)
 		go func(id int) {
-			insertWorker(ctx, id, jobs, connString, dbTarget)
+			insertWorker(ctx, id, jobs, connString, dbTarget, useBulkInsert)
 			wg.Done()
 		}(i)
 	}
@@ -103,7 +104,7 @@ csvScanLoop:
 //   - the time it took to insert (if provided in the response)
 //   - the latency of getting a response
 //   - time spend waiting for receiving the next job through channel
-func insertWorker(ctx context.Context, id int, tripEventBatches <-chan []TripEvent, connString string, dbTarget DBTarget) {
+func insertWorker(ctx context.Context, id int, tripEventBatches <-chan []TripEvent, connString string, dbTarget DBTarget, useBulkInsert bool) {
 	logger.Info("Worker started", "id", id)
 
 	conn, err := pgx.Connect(ctx, connString)
@@ -114,12 +115,20 @@ func insertWorker(ctx context.Context, id int, tripEventBatches <-chan []TripEve
 	defer conn.Close(ctx)
 	logger.Info("Worker connected to db", "id", id)
 
-	getInsertTripEventSql := getInsertTripEventCratedbSql
+	insertEventSql := insertEventCratedbSql
 	switch dbTarget {
 	case CrateDB:
-		getInsertTripEventSql = getInsertTripEventCratedbSql
+		insertEventSql = insertEventCratedbSql
 	case MobilityDB:
-		getInsertTripEventSql = getInsertTripEventMobilitydbSql
+		insertEventSql = insertEventMobilitydbSql
+	}
+
+	bulkInsertEventSql := bulkInsertEventCratedbSql
+	switch dbTarget {
+	case CrateDB:
+		bulkInsertEventSql = bulkInsertEventCratedbSql
+	case MobilityDB:
+		bulkInsertEventSql = bulkInsertEventMobilitydbSql
 	}
 
 	insertedEvents := 0
@@ -152,34 +161,42 @@ func insertWorker(ctx context.Context, id int, tripEventBatches <-chan []TripEve
 			waitedForJobTime := time.Since(lastJobFinishTime)
 
 			successfullInserts := len(batch)
+			eventsInBatch := len(batch)
 			startTime := time.Now()
 
-			// Use pgx batch for efficient batch inserts
-			pgxBatch := &pgx.Batch{}
-			for _, tEvent := range batch {
-				query := getInsertTripEventSql(tEvent)
-				pgxBatch.Queue(query)
-			}
-
-			batchResults := conn.SendBatch(ctx, pgxBatch)
-			eventsInBatch := len(batch)
-			for range eventsInBatch {
-				_, err := batchResults.Exec()
-				if err != nil {
-					successfullInserts--
-					failedInserts++
-					logger.Debug("Error inserting escooter event", "worker", id, "error", err)
-				} else {
-					insertedEvents++
+			if useBulkInsert {
+				insertQuery := bulkInsertEventSql(batch)
+				res, err := conn.Exec(ctx, insertQuery)
+				successfullInserts -= len(batch) - int(res.RowsAffected())
+				logger.Info("Bulk inserted trip events", "worker", id, "rowsAffected", res.RowsAffected(), "error", err)
+			} else {
+				// Use pgx batch for efficient batch inserts
+				pgxBatch := &pgx.Batch{}
+				for _, tEvent := range batch {
+					query := insertEventSql(tEvent)
+					pgxBatch.Queue(query)
 				}
+
+				batchResults := conn.SendBatch(ctx, pgxBatch)
+				for range eventsInBatch {
+					_, err := batchResults.Exec()
+					if err != nil {
+						successfullInserts--
+						failedInserts++
+						logger.Debug("Error inserting escooter event", "worker", id, "error", err)
+					} else {
+						insertedEvents++
+					}
+				}
+				batchResults.Close()
 			}
-			batchResults.Close()
 
 			endTime := time.Now()
 			logger.Info("Worker finished batch insert",
 				"workerId", id,
 				"jobType", "batch_insert",
 				"batchSize", eventsInBatch,
+				"useBulkInsert", useBulkInsert,
 				"startTime", startTime,
 				"endTime", endTime,
 				"insertTimeInMs", endTime.Sub(startTime).Milliseconds(),
@@ -193,31 +210,112 @@ func insertWorker(ctx context.Context, id int, tripEventBatches <-chan []TripEve
 	}
 }
 
-func getInsertTripEventCratedbSql(tEvent TripEvent) string {
+func insertEventCratedbSql(tEvent TripEvent) string {
 	return fmt.Sprintf(`
 	INSERT INTO escooter_events (
-		event_id,
-		trip_id,
-		timestamp,
-		geo_point
+		event_id, trip_id, timestamp, geo_point
 	)
 	VALUES (
 		'%s', '%s', '%s', [%s, %s]
-	);`, tEvent.EventID, tEvent.TripID, tEvent.Timestamp, tEvent.Latitude, tEvent.Longitude)
+	);`, tEvent.EventID, tEvent.TripID, tEvent.Timestamp, tEvent.Longitude, tEvent.Latitude)
 }
 
-func getInsertTripEventMobilitydbSql(tEvent TripEvent) string {
+func insertEventMobilitydbSql(tEvent TripEvent) string {
 	return fmt.Sprintf(`
 	INSERT INTO escooter_events (
-		event_id,
+		event_id, trip_id, timestamp, location
+	)
+	VALUES (
+		'%s', '%s', '%s', tgeompoint 'Point(%s %s)@%s'
+	);`, tEvent.EventID, tEvent.TripID, tEvent.Timestamp, tEvent.Longitude, tEvent.Latitude, tEvent.Timestamp)
+}
+
+func bulkInsertEventCratedbSql(events []TripEvent) string {
+	var eventIds strings.Builder
+	var tripIds strings.Builder
+	var timestamps strings.Builder
+	var locations strings.Builder
+	for i, tEvent := range events {
+		if i != 0 {
+			const prefix = ','
+			eventIds.WriteRune(prefix)
+			tripIds.WriteRune(prefix)
+			timestamps.WriteRune(prefix)
+			locations.WriteRune(prefix)
+		}
+
+		eventIds.WriteRune('\'')
+		eventIds.WriteString(tEvent.EventID)
+		eventIds.WriteRune('\'')
+
+		tripIds.WriteRune('\'')
+		tripIds.WriteString(tEvent.TripID)
+		tripIds.WriteRune('\'')
+
+		timestamps.WriteRune('\'')
+		timestamps.WriteString(tEvent.Timestamp)
+		timestamps.WriteRune('\'')
+
+		locations.WriteRune('\'')
+		locations.WriteString(fmt.Sprintf("POINT( %s %s )", tEvent.Longitude, tEvent.Latitude))
+		locations.WriteRune('\'')
+	}
+
+	return fmt.Sprintf(`
+	INSERT INTO escooter_events (
+		event_id, trip_id, timestamp, geo_point
+	)
+	(SELECT *
+		FROM  UNNEST(
+			[%s], [%s], [%s], [%s]
+		)
+	);`, eventIds.String(), tripIds.String(), timestamps.String(), locations.String())
+}
+
+func bulkInsertEventMobilitydbSql(events []TripEvent) string {
+	var eventIds strings.Builder
+	var tripIds strings.Builder
+	var timestamps strings.Builder
+	var locations strings.Builder
+	for i, tEvent := range events {
+		if i != 0 {
+			const prefix = ','
+			eventIds.WriteRune(prefix)
+			tripIds.WriteRune(prefix)
+			timestamps.WriteRune(prefix)
+			locations.WriteRune(prefix)
+		}
+
+		eventIds.WriteRune('\'')
+		eventIds.WriteString(tEvent.EventID)
+		eventIds.WriteRune('\'')
+
+		tripIds.WriteRune('\'')
+		tripIds.WriteString(tEvent.TripID)
+		tripIds.WriteRune('\'')
+
+		timestamps.WriteRune('\'')
+		timestamps.WriteString(tEvent.Timestamp)
+		timestamps.WriteRune('\'')
+
+		locations.WriteString(fmt.Sprintf(
+			"tgeompoint 'Point(%s %s)@%s'", tEvent.Longitude, tEvent.Latitude, tEvent.Timestamp),
+		)
+	}
+
+	return fmt.Sprintf(`
+	INSERT INTO escooter_events (
+		event_id, 
 		trip_id,
 		timestamp,
 		location
 	)
-	VALUES (
-		'%s', 
-		'%s',
-		'%s',
-		tgeompoint 'Point(%s %s)@%s'
-	);`, tEvent.EventID, tEvent.TripID, tEvent.Timestamp, tEvent.Longitude, tEvent.Latitude, tEvent.Timestamp)
+	(SELECT *
+		FROM  UNNEST(
+		ARRAY[%s]::UUID[],
+		ARRAY[%s]::UUID[],
+		ARRAY[%s]::TIMESTAMP[],
+		ARRAY[%s]::tgeompoint[]
+		)
+	);`, eventIds.String(), tripIds.String(), timestamps.String(), locations.String())
 }

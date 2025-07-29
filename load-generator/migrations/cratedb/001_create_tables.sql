@@ -1,3 +1,7 @@
+DROP TABLE IF EXISTS escooter_events;
+DROP TABLE IF EXISTS pois;
+DROP TABLE IF EXISTS districts;
+
 CREATE TABLE IF NOT EXISTS escooter_events (
     event_id TEXT,
     trip_id TEXT,
