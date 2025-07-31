@@ -30,3 +30,9 @@ One could also evaluate the performance and scalability of \mobilitydbc with tra
 
 There is a big speed difference in iops and thus database performance on PVCs for kubernetes in azure cloud.
 The disks provided with VMs are much faster otherwise the disk speed (IOPS) depends on the allocated storage
+
+When sending many single inserts in a batch, the performance of the cratedb has been terrible compared to mobilitydbc.
+This could have been due to some configuration or cratedb is not optimized for this driver and has to parse every request anew.
+
+MobilityDB has more features such as the ability to count the time an object spends near a POI or other object as it is able to interpolate the data.
+Additionally MobilityDB allows data compression as some datapoints can be removed as the interpolation covers them perfectly
