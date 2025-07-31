@@ -93,7 +93,7 @@ func ValidateTemplates(ctx context.Context, templates *template.Template, connSt
 		templateNames[i] = tmpl.Name()
 	}
 
-	logger.Info("Validating the templates by running all the query types on database", "templateNames", templateNames, "generator", *generator)
+	logger.Info("Validating the templates by running all the query types on database", "templateNames", templateNames)
 
 	fields := generator.GenerateFields(0)
 
@@ -108,6 +108,7 @@ func ValidateTemplates(ctx context.Context, templates *template.Template, connSt
 		rows, err := conn.Query(ctx, query.String())
 		if err != nil {
 			logger.Error("Template validation failed on querying the database", "template", tmpl.Name(), "error", err, "query", query.String())
+			rows.Close()
 			return err
 		}
 		rows.Close()
