@@ -97,6 +97,14 @@ csvScanLoop:
 		logger.Info("All escooter trip events added", "count", tripEventsCount, "timeElapsedInSec", endTime.Sub(startTime).Seconds(), "startTime", startTime, "endTime", endTime)
 	}
 
+	// Create trips table
+	if dbTarget == MobilityDB {
+		err := importEventsIntoTrips(ctx, connString)
+		if err != nil {
+			logger.Error("Error during import of events into trips table", "error", err)
+			os.Exit(1)
+		}
+	}
 }
 
 // each worker should measure and log all available metrics
@@ -212,22 +220,22 @@ func insertWorker(ctx context.Context, id int, tripEventBatches <-chan []TripEve
 
 func insertEventCratedbSql(tEvent TripEvent) string {
 	return fmt.Sprintf(`
-	INSERT INTO escooter_events (
-		event_id, trip_id, timestamp, geo_point
-	)
-	VALUES (
-		'%s', '%s', '%s', [%s, %s]
-	);`, tEvent.EventID, tEvent.TripID, tEvent.Timestamp, tEvent.Longitude, tEvent.Latitude)
+INSERT INTO escooter_events (
+	event_id, trip_id, timestamp, geo_point
+)
+VALUES (
+	'%s', '%s', '%s', [%s, %s]
+);`, tEvent.EventID, tEvent.TripID, tEvent.Timestamp, tEvent.Longitude, tEvent.Latitude)
 }
 
 func insertEventMobilitydbSql(tEvent TripEvent) string {
 	return fmt.Sprintf(`
-	INSERT INTO escooter_events (
-		event_id, trip_id, timestamp, tpoint
-	)
-	VALUES (
-		'%s', '%s', '%s', tgeogpoint 'SRID=4326;POINT(%s %s)@%s'
-	);`, tEvent.EventID, tEvent.TripID, tEvent.Timestamp, tEvent.Longitude, tEvent.Latitude, tEvent.Timestamp)
+INSERT INTO escooter_events (
+	event_id, trip_id, timestamp, geo_point
+)
+VALUES (
+	'%s', '%s', '%s', 'SRID=4326;POINT(%s %s)'
+);`, tEvent.EventID, tEvent.TripID, tEvent.Timestamp, tEvent.Longitude, tEvent.Latitude)
 }
 
 func bulkInsertEventCratedbSql(events []TripEvent) string {
@@ -243,20 +251,20 @@ func bulkInsertEventCratedbSql(events []TripEvent) string {
 	}
 
 	return fmt.Sprintf(`
-	INSERT INTO escooter_events (
-		event_id,
-		trip_id,
-		timestamp,
-		geo_point
+INSERT INTO escooter_events (
+	event_id,
+	trip_id,
+	timestamp,
+	geo_point
+)
+(SELECT *
+	FROM  UNNEST(
+	[%s],
+	[%s],
+	[%s],
+	[%s]
 	)
-	(SELECT *
-		FROM  UNNEST(
-		[%s],
-		[%s],
-		[%s],
-		[%s]
-		)
-	);`,
+);`,
 		joinAndQuoteStrings(eventIds),
 		joinAndQuoteStrings(tripIds),
 		joinAndQuoteStrings(timestamps),
@@ -268,32 +276,59 @@ func bulkInsertEventMobilitydbSql(events []TripEvent) string {
 	eventIds := make([]string, len(events))
 	tripIds := make([]string, len(events))
 	timestamps := make([]string, len(events))
-	tpoints := make([]string, len(events))
+	geo_points := make([]string, len(events))
 	for i, tEvent := range events {
 		eventIds[i] = tEvent.EventID
 		tripIds[i] = tEvent.TripID
 		timestamps[i] = tEvent.Timestamp
-		tpoints[i] = fmt.Sprintf("SRID=4326;POINT(%s %s)@%s", tEvent.Longitude, tEvent.Latitude, tEvent.Timestamp)
+		geo_points[i] = fmt.Sprintf("SRID=4326;POINT(%s %s)", tEvent.Longitude, tEvent.Latitude)
 	}
 
 	return fmt.Sprintf(`
-		INSERT INTO escooter_events (
-		event_id, 
-		trip_id,
-		timestamp,
-		tgeo_point
-		)
-		(SELECT *
-		FROM  UNNEST(
-		ARRAY[%s]::UUID[],
-		ARRAY[%s]::UUID[],
-		ARRAY[%s]::TIMESTAMP[],
-		ARRAY[%s]::tgeogpoint[]
-		)
-		);`,
+INSERT INTO escooter_events (
+event_id, 
+trip_id,
+timestamp,
+geo_point
+)
+(SELECT *
+FROM  UNNEST(
+ARRAY[%s]::UUID[],
+ARRAY[%s]::UUID[],
+ARRAY[%s]::TIMESTAMPTZ[],
+ARRAY[%s]::geometry(Point, 4326)[]
+));`,
 		joinAndQuoteStrings(eventIds),
 		joinAndQuoteStrings(tripIds),
 		joinAndQuoteStrings(timestamps),
-		joinAndQuoteStrings(tpoints),
+		joinAndQuoteStrings(geo_points),
 	)
+}
+
+func importEventsIntoTrips(ctx context.Context, connString string) error {
+	startTime := time.Now()
+	logger.Info("Importing escooter_events into trips table", "startTime", startTime)
+
+	conn, err := pgx.Connect(ctx, connString)
+	if err != nil {
+		return fmt.Errorf("Unable to connect to database: %w", err)
+	}
+	defer conn.Close(ctx)
+
+	query := `
+INSERT INTO trips
+SELECT trip_id, tgeogpointseq(array_agg(tgeogpoint(geo_point, timestamp) ORDER BY timestamp)) AS trip
+FROM escooter_events
+GROUP BY trip_id
+ON CONFLICT (trip_id) DO UPDATE
+	SET trip = EXCLUDED.trip;`
+
+	_, err = conn.Exec(ctx, query)
+	if err != nil {
+		return fmt.Errorf("Executing insert to trips from escooter events: %w", err)
+	}
+
+	endTime := time.Now()
+	logger.Info("Finished importing escooter_events into trips table", "startTime", startTime, "endTime", endTime, "durationInS", endTime.Sub(startTime).Seconds())
+	return nil
 }

@@ -42,17 +42,12 @@ func mustInitializeDb(ctx context.Context, connString string, dbTarget DBTarget,
 			os.Exit(1)
 		}
 
-		statements := strings.SplitSeq(string(migrationSQL), ";")
-		for stmt := range statements {
-			stmt = strings.TrimSpace(stmt)
-			if stmt == "" {
-				continue
-			}
-			if _, err := conn.Exec(ctx, stmt); err != nil {
-				logger.Error("Error executing migration", "file", migrationFile, "error", err)
-				os.Exit(1)
-			}
+		_, err = conn.Exec(ctx, string(migrationSQL))
+		if err != nil {
+			logger.Error("Error executing migration", "migrationFile", migrationFile, "error", err)
+			os.Exit(1)
 		}
+
 		logger.Info("Migration completed successfully", "file", migrationFile)
 	}
 

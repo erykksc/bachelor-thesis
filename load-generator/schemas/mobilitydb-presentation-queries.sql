@@ -1,16 +1,7 @@
--- Create trip table
-
-SELECT vehicle, day, seq,
-tgeompoint_seq(array_agg(tgeompoint_inst( pos, T) ORDER BY T)) AS trip
-FROM input
-GROUP BY vehicle, day, seq
-LIMIT 10;
-
-
---2) Display the geospatial trips in a reddable text format:
-SELECT astext(trip):: varchar (100) AS trip
-FROM trips
-LIMIT 5;
+-- --2) Display the geospatial trips in a reddable text format:
+-- SELECT astext(trip):: varchar (100) AS trip
+-- FROM trips
+-- LIMIT 5;
 
 
 --3) Display the individual observations composing the trip:
@@ -25,7 +16,7 @@ FROM trips
 LIMIT 5;
 
 --5) What is the time span of the whole dataset ?
-SELECT MIN(startTimestamp(trip)) AS begin, MAXendTimestamp (trip)) AS end
+SELECT MIN(startTimestamp(trip)) AS begin, MAX(endTimestamp (trip)) AS end
 FROM trips;
 
 --6) What is the driven distance of every trip ?
@@ -34,14 +25,16 @@ FROM trips
 LIMIT 5;
 
 --7) Dataset summaries:
-SELECT, MIN (length (trip)) AS minLength, MAX (length(trip)) AS maxLength,
-AVG (length(trip)) AS avgLength,
-MIN (duration (trip)) AS minDuration, MAX (duration(trip)) AS maxDuration,
-AVG (duration(trip)) AS avgDuration,
-MIN (numInstants (trip)) AS minPoints,
-MAX (numInstants(trip)) AS maxPoints,
-AVG (numInstants(trip)) AS avgPoints,
-AVG (numInstants(trip) * 60 / extract (epoch from timespan(trip))) AS avgPointsPerMinute
+SELECT 
+	MIN (length (trip)) AS minLength,
+	MAX (length(trip)) AS maxLength,
+	AVG (length(trip)) AS avgLength,
+	MIN (duration (trip)) AS minDuration, MAX (duration(trip)) AS maxDuration,
+	AVG (duration(trip)) AS avgDuration,
+	MIN (numInstants (trip)) AS minPoints,
+	MAX (numInstants(trip)) AS maxPoints,
+	AVG (numInstants(trip)) AS avgPoints,
+	AVG (numInstants(trip) * 60 / extract (epoch from timespan(trip))) AS avgPointsPerMinute
 FROM trips;
 
 --9) Compute the time-varying speed of the vehicles:
@@ -56,25 +49,26 @@ LIMIT 5;
 
 --11) (Temporal Aggregation) What is the count of vehicles at every instant between 16h00 and 19h00 in 20
 SELECT tcount (
-	atperiod (trip, period ('2020-06-01 16:00:00', '2020-06-01 19:00:00'))) numTrips
+	atTime (trip, tstzspan '[2020-06-01 16:00:00, 2020-06-01 19:00:00]')) numTrips
 FROM trips t
-WHERE t. trip && period('2020-06-01 16:00:00'. '2020-06-01 19:00:00');
+WHERE t.trip && tstzspan '[2020-06-01 16:00:00, 2020-06-01 19:00:00]';
 
 -- unnest the aggregation into multiple rows
 SELECT unnest (instants (tcount(
-atperiod (trip, period('2020-06-01 16:00:00', '2020-06-01 19:00:00'))))) numTrips
+atTime (trip, tstzspan '[2020-06-01 16:00:00, 2020-06-01 19:00:00]')))) numTrips
 FROM trips t
-WHERE t. trip && period('2020-06-01 16:00:00,', '2020-06-01 19:00:00');
+WHERE t.trip && tstzspan '[2020-06-01 16:00:00, 2020-06-01 19:00:00]';
 
 --12) Compute the cumulative distance traveled by a vehicle as a temporal float:
 SELECT
-cumulativeLength (trip)::varchar (100) AS cumulativeLength, endValue(cumulativeLength(trip)) AS totalLengthl,
-length(trip) AS totalLength2
+	cumulativeLength (trip)::varchar (100) AS cumulativeLength,
+	endValue(cumulativeLength(trip)) AS totalLength,
+	length(trip) AS totalLength2
 FROM trips
 LIMIT 5;
 
 -- 14) (Spatial range and intersection) Which vehicle trips passed in the municipality of Evere
-SELECT t. vehicle, t.day, t.seq
+SELECT t.vehicle, t.day, t.seq
 FROM trips t, communes c
 WHERE c.name like '%Evere%' and intersects(t.trip, c.geom);
 
