@@ -58,6 +58,9 @@ spec:
               value: coordinator
             - name: PGDATA
               value: /var/lib/postgresql/data/pgdata
+            # PostgreSQL performance tuning for MobilityDB
+            - name: POSTGRES_INITDB_ARGS
+              value: "-c statement_timeout=300000 -c work_mem=512MB -c shared_buffers=2GB -c max_connections=1010"
           ports:
             - containerPort: 5432
               protocol: TCP
@@ -66,4 +69,5 @@ spec:
               mountPath: /var/lib/postgresql/data
       volumes:
         - name: postgresql-data
-          emptyDir: {}
+          emptyDir:
+            medium: ""  # Use node filesystem instead of memory
