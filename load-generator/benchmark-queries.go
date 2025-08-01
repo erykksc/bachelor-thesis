@@ -42,11 +42,13 @@ func benchmarkQueries(ctx context.Context, connString string, numWorkers int, db
 	// Start workers
 	readyStatus := make(chan int, numWorkers)
 	jobs := make(chan QueryJob, runtime.NumCPU()*100) // larger buffer to combat workers waiting for main thread to read the csv file
+	successCh := make(chan int, numWorkers)
+	failureCh := make(chan int, numWorkers)
 	var wg sync.WaitGroup
 	for i := 1; i <= numWorkers; i++ {
 		wg.Add(1)
 		go func(id int) {
-			queryWorker(ctx, id, connString, queryTemplates, jobs, readyStatus)
+			queryWorker(ctx, id, connString, queryTemplates, jobs, readyStatus, successCh, failureCh)
 			wg.Done()
 		}(i)
 	}
@@ -88,6 +90,17 @@ Waiting4Workers:
 	}
 	close(jobs)
 	wg.Wait()
+	
+	// Collect success and failure counts from all workers
+	totalSuccesses := 0
+	totalFailures := 0
+	for range numWorkers {
+		totalSuccesses += <-successCh
+		totalFailures += <-failureCh
+	}
+	close(successCh)
+	close(failureCh)
+	
 	endTime := time.Now()
 	if ctx.Err() == nil {
 		logger.Info("All query workers finished",
@@ -95,6 +108,8 @@ Waiting4Workers:
 			"timeElapsedInSec", endTime.Sub(startTime).Seconds(),
 			"startTime", startTime,
 			"endTime", endTime,
+			"totalSuccesses", totalSuccesses,
+			"totalFailures", totalFailures,
 		)
 	}
 }
@@ -182,7 +197,7 @@ type QueryJob struct {
 }
 
 // queryWorker executes queries
-func queryWorker(ctx context.Context, id int, connString string, templates *template.Template, jobs <-chan QueryJob, readyStatus chan<- int) {
+func queryWorker(ctx context.Context, id int, connString string, templates *template.Template, jobs <-chan QueryJob, readyStatus chan<- int, successCh chan<- int, failureCh chan<- int) {
 	logger.Info("Query worker started", "id", id)
 
 	conn, err := pgx.Connect(ctx, connString)
@@ -200,6 +215,8 @@ func queryWorker(ctx context.Context, id int, connString string, templates *temp
 	readyStatus <- id
 
 	defer func() {
+		successCh <- successfulQueries
+		failureCh <- failedQueries
 		logger.Info(
 			"Query worker finished",
 			"id", id,

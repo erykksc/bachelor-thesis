@@ -17,10 +17,12 @@ func benchmarkInserts(ctx context.Context, connString string, numWorkers int, ba
 	// create specified number of workers
 	var wg sync.WaitGroup
 	jobs := make(chan []TripEvent, numWorkers*5) // batches of events
+	successCh := make(chan int, numWorkers)
+	failureCh := make(chan int, numWorkers)
 	for i := 1; i <= numWorkers; i++ {
 		wg.Add(1)
 		go func(id int) {
-			insertWorker(ctx, id, jobs, connString, dbTarget, useBulkInsert)
+			insertWorker(ctx, id, jobs, connString, dbTarget, useBulkInsert, successCh, failureCh)
 			wg.Done()
 		}(i)
 	}
@@ -92,9 +94,20 @@ csvScanLoop:
 
 	close(jobs)
 	wg.Wait()
+
+	// Collect success and failure counts from all workers
+	totalSuccesses := 0
+	totalFailures := 0
+	for range numWorkers {
+		totalSuccesses += <-successCh
+		totalFailures += <-failureCh
+	}
+	close(successCh)
+	close(failureCh)
+
 	endTime := time.Now()
 	if ctx.Err() == nil {
-		logger.Info("All escooter trip events added", "count", tripEventsCount, "timeElapsedInSec", endTime.Sub(startTime).Seconds(), "startTime", startTime, "endTime", endTime)
+		logger.Info("All escooter trip events added", "count", tripEventsCount, "timeElapsedInSec", endTime.Sub(startTime).Seconds(), "startTime", startTime, "endTime", endTime, "totalSuccesses", totalSuccesses, "totalFailures", totalFailures)
 	}
 
 	// Create trips table
@@ -112,7 +125,7 @@ csvScanLoop:
 //   - the time it took to insert (if provided in the response)
 //   - the latency of getting a response
 //   - time spend waiting for receiving the next job through channel
-func insertWorker(ctx context.Context, id int, tripEventBatches <-chan []TripEvent, connString string, dbTarget DBTarget, useBulkInsert bool) {
+func insertWorker(ctx context.Context, id int, tripEventBatches <-chan []TripEvent, connString string, dbTarget DBTarget, useBulkInsert bool, successCh chan<- int, failureCh chan<- int) {
 	logger.Info("Worker started", "id", id)
 
 	conn, err := pgx.Connect(ctx, connString)
@@ -139,15 +152,17 @@ func insertWorker(ctx context.Context, id int, tripEventBatches <-chan []TripEve
 		bulkInsertEventSql = bulkInsertEventMobilitydbSql
 	}
 
-	insertedEvents := 0
-	failedInserts := 0
+	insertedByWorker := 0
+	failedInsertsByWorker := 0
 
 	defer func() {
+		successCh <- insertedByWorker
+		failureCh <- failedInsertsByWorker
 		logger.Info(
 			"Insert worker finished",
 			"id", id,
-			"insertedEvents", insertedEvents,
-			"failedInserts", failedInserts,
+			"insertedEvents", insertedByWorker,
+			"failedInserts", failedInsertsByWorker,
 			"ctxErr", ctx.Err(),
 		)
 	}()
@@ -168,14 +183,14 @@ func insertWorker(ctx context.Context, id int, tripEventBatches <-chan []TripEve
 
 			waitedForJobTime := time.Since(lastJobFinishTime)
 
-			successfullInserts := len(batch)
-			eventsInBatch := len(batch)
+			insertedInQuery := 0
+			batchSize := len(batch)
 			startTime := time.Now()
 
 			if useBulkInsert {
 				insertQuery := bulkInsertEventSql(batch)
 				res, err := conn.Exec(ctx, insertQuery)
-				successfullInserts -= len(batch) - int(res.RowsAffected())
+				insertedInQuery -= batchSize - int(res.RowsAffected())
 				logger.Info("Bulk inserted trip events", "worker", id, "rowsAffected", res.RowsAffected(), "error", err)
 			} else {
 				// Use pgx batch for efficient batch inserts
@@ -186,14 +201,12 @@ func insertWorker(ctx context.Context, id int, tripEventBatches <-chan []TripEve
 				}
 
 				batchResults := conn.SendBatch(ctx, pgxBatch)
-				for range eventsInBatch {
+				for range batchSize {
 					_, err := batchResults.Exec()
 					if err != nil {
-						successfullInserts--
-						failedInserts++
-						logger.Debug("Error inserting escooter event", "worker", id, "error", err)
+						logger.Error("Error inserting escooter event", "worker", id, "error", err)
 					} else {
-						insertedEvents++
+						insertedInQuery++
 					}
 				}
 				batchResults.Close()
@@ -203,17 +216,18 @@ func insertWorker(ctx context.Context, id int, tripEventBatches <-chan []TripEve
 			logger.Info("Worker finished batch insert",
 				"workerId", id,
 				"jobType", "batch_insert",
-				"batchSize", eventsInBatch,
+				"batchSize", batchSize,
 				"useBulkInsert", useBulkInsert,
 				"startTime", startTime,
 				"endTime", endTime,
 				"insertTimeInMs", endTime.Sub(startTime).Milliseconds(),
 				"waitedForJobTimeInMs", waitedForJobTime.Milliseconds(),
-				"successfullyInserted", successfullInserts,
+				"successfullyInserted", insertedInQuery,
 			)
-			lastJobFinishTime = time.Now()
+			insertedByWorker += insertedInQuery
+			failedInsertsByWorker += batchSize - insertedInQuery
 
-			logger.Debug("Worker: batch inserted into db", "id", id, "batchSize", len(batch))
+			lastJobFinishTime = time.Now()
 		}
 	}
 }
