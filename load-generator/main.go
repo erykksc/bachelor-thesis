@@ -14,6 +14,7 @@ import (
 	"runtime"
 	"strings"
 	"text/template"
+	"time"
 )
 
 var logger *slog.Logger
@@ -138,13 +139,23 @@ func main() {
 		mustInitializeDb(ctx, *connString, dbTarget, pois, districts, *migrationsDir)
 
 	case "insert":
-		benchmarkInserts(ctx, *connString, *numWorkers, *batchSize, *useBulkInsert, dbTarget, *tripsPath)
+		csvFile := createInsertCSVFile(dbTarget, *numWorkers, *batchSize, *useBulkInsert, *tripsPath)
+		defer csvFile.Close()
+		csvWriter := csv.NewWriter(csvFile)
+		defer csvWriter.Flush()
+
+		benchmarkInserts(ctx, *connString, *numWorkers, *batchSize, *useBulkInsert, dbTarget, *tripsPath, csvWriter)
 
 	case "query":
 		queryTemplates := mustLoadTemplates(*queriesFilepath)
-
 		logger.Info("Loaded read queries templates", "count", len(queryTemplates.Templates()))
-		benchmarkQueries(ctx, *connString, *numWorkers, dbTarget, *tripEventsCSV, districts, pois, queryTemplates, *numQueries, *randomSeed)
+
+		csvFile := createQueryCSVFile(dbTarget, *numWorkers, *numQueries, *queriesFilepath)
+		defer csvFile.Close()
+		csvWriter := csv.NewWriter(csvFile)
+		defer csvWriter.Flush()
+
+		benchmarkQueries(ctx, *connString, *numWorkers, dbTarget, *tripEventsCSV, districts, pois, queryTemplates, *numQueries, *randomSeed, csvWriter)
 
 	default:
 		logger.Error("unknown mode", "mode", *mode)
@@ -232,4 +243,45 @@ func mustLoadTemplates(templatesFilepath string) *template.Template {
 		}
 	}
 	return queryTemplates
+}
+
+func createInsertCSVFile(dbTarget DBTarget, numWorkers, batchSize int, useBulkInsert bool, tripsPath string) *os.File {
+	timestamp := time.Now().Format("20060102_150405")
+	tripsBasename := strings.TrimSuffix(filepath.Base(tripsPath), filepath.Ext(tripsPath))
+
+	var bulkStr string
+	if useBulkInsert {
+		bulkStr = "bulk"
+	} else {
+		bulkStr = "batch"
+	}
+
+	filename := fmt.Sprintf("results_insert_%s_%s_%dw_%db_%s_%s.csv",
+		dbTarget.String(), timestamp, numWorkers, batchSize, bulkStr, tripsBasename)
+
+	file, err := os.Create(filename)
+	if err != nil {
+		logger.Error("Failed to create insert CSV file", "filename", filename, "error", err)
+		os.Exit(1)
+	}
+
+	logger.Info("Created insert results CSV file", "filename", filename)
+	return file
+}
+
+func createQueryCSVFile(dbTarget DBTarget, numWorkers, numQueries int, queriesPath string) *os.File {
+	timestamp := time.Now().Format("20060102_150405")
+	queriesBasename := strings.TrimSuffix(filepath.Base(queriesPath), filepath.Ext(queriesPath))
+
+	filename := fmt.Sprintf("results_query_%s_%s_%dw_%dq_%s.csv",
+		dbTarget.String(), timestamp, numWorkers, numQueries, queriesBasename)
+
+	file, err := os.Create(filename)
+	if err != nil {
+		logger.Error("Failed to create query CSV file", "filename", filename, "error", err)
+		os.Exit(1)
+	}
+
+	logger.Info("Created query results CSV file", "filename", filename)
+	return file
 }

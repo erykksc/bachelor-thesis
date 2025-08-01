@@ -12,21 +12,97 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-func benchmarkInserts(ctx context.Context, connString string, numWorkers int, batchSize int, useBulkInsert bool, dbTarget DBTarget, tripsFilename string) {
+type InsertEvent struct {
+	WorkerID             int
+	JobType              string
+	BatchSize            int
+	UseBulkInsert        bool
+	StartTime            string
+	EndTime              string
+	InsertDurationMs     int64
+	WaitedForJobTimeMs   int64
+	SuccessfullyInserted int
+	FailedInserts        int
+}
+
+func benchmarkInserts(ctx context.Context, connString string, numWorkers int, batchSize int, useBulkInsert bool, dbTarget DBTarget, tripsFilename string, csvWriter *csv.Writer) {
 	logger.Info("Starting Insert Benchmark", "dbConnString", connString, "numWorkers", numWorkers, "dbTarget", dbTarget.String(), "tripsFilename", tripsFilename)
 	// create specified number of workers
 	var wg sync.WaitGroup
+	readyStatus := make(chan int, numWorkers)
 	jobs := make(chan []TripEvent, numWorkers*5) // batches of events
 	successCh := make(chan int, numWorkers)
 	failureCh := make(chan int, numWorkers)
+	eventCh := make(chan InsertEvent, numWorkers*10)
 	for i := 1; i <= numWorkers; i++ {
 		wg.Add(1)
 		go func(id int) {
-			insertWorker(ctx, id, jobs, connString, dbTarget, useBulkInsert, successCh, failureCh)
+			insertWorker(ctx, id, jobs, connString, dbTarget, useBulkInsert, successCh, failureCh, eventCh, readyStatus)
 			wg.Done()
 		}(i)
 	}
 	logger.Info("Started worker threads", "numWorkers", numWorkers)
+
+	// Write CSV header
+	csvHeader := []string{"workerId", "jobType", "batchSize", "useBulkInsert", "startTime", "endTime", "insertDurationMs", "waitedForJobTimeMs", "successfullyInserted", "failedInserts"}
+	if err := csvWriter.Write(csvHeader); err != nil {
+		logger.Error("Failed to write CSV header", "error", err)
+		os.Exit(1)
+	}
+
+	// Start CSV writer goroutine
+	var csvWg sync.WaitGroup
+	csvWg.Add(1)
+	go func() {
+		defer csvWg.Done()
+		for event := range eventCh {
+			// Log the event (replacing worker logging)
+			logger.Info("Worker finished batch insert",
+				"workerId", event.WorkerID,
+				"jobType", event.JobType,
+				"batchSize", event.BatchSize,
+				"useBulkInsert", event.UseBulkInsert,
+				"startTime", event.StartTime,
+				"endTime", event.EndTime,
+				"insertDurationMs", event.InsertDurationMs,
+				"waitedForJobTimeMs", event.WaitedForJobTimeMs,
+				"successfullyInserted", event.SuccessfullyInserted,
+			)
+
+			// Write to CSV
+			record := []string{
+				fmt.Sprintf("%d", event.WorkerID),
+				event.JobType,
+				fmt.Sprintf("%d", event.BatchSize),
+				fmt.Sprintf("%t", event.UseBulkInsert),
+				event.StartTime,
+				event.EndTime,
+				fmt.Sprintf("%d", event.InsertDurationMs),
+				fmt.Sprintf("%d", event.WaitedForJobTimeMs),
+				fmt.Sprintf("%d", event.SuccessfullyInserted),
+				fmt.Sprintf("%d", event.FailedInserts),
+			}
+			if err := csvWriter.Write(record); err != nil {
+				logger.Error("Failed to write CSV record", "error", err)
+			}
+		}
+	}()
+
+	// Wait for all workers to signal ready
+	workersReady := 0
+Waiting4Workers:
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case readyWorkerId := <-readyStatus:
+			logger.Info("Worker reported ready", "id", readyWorkerId)
+			workersReady += 1
+			if workersReady == numWorkers {
+				break Waiting4Workers
+			}
+		}
+	}
 
 	// open the csv file
 	f, err := os.Open(tripsFilename)
@@ -95,6 +171,10 @@ csvScanLoop:
 	close(jobs)
 	wg.Wait()
 
+	// Close event channel and wait for CSV writer to finish
+	close(eventCh)
+	csvWg.Wait()
+
 	// Collect success and failure counts from all workers
 	totalSuccesses := 0
 	totalFailures := 0
@@ -125,7 +205,7 @@ csvScanLoop:
 //   - the time it took to insert (if provided in the response)
 //   - the latency of getting a response
 //   - time spend waiting for receiving the next job through channel
-func insertWorker(ctx context.Context, id int, tripEventBatches <-chan []TripEvent, connString string, dbTarget DBTarget, useBulkInsert bool, successCh chan<- int, failureCh chan<- int) {
+func insertWorker(ctx context.Context, id int, tripEventBatches <-chan []TripEvent, connString string, dbTarget DBTarget, useBulkInsert bool, successCh chan<- int, failureCh chan<- int, eventCh chan<- InsertEvent, readyStatus chan<- int) {
 	logger.Info("Worker started", "id", id)
 
 	conn, err := pgx.Connect(ctx, connString)
@@ -135,6 +215,8 @@ func insertWorker(ctx context.Context, id int, tripEventBatches <-chan []TripEve
 	}
 	defer conn.Close(ctx)
 	logger.Info("Worker connected to db", "id", id)
+
+	readyStatus <- id
 
 	insertEventSql := insertEventCratedbSql
 	switch dbTarget {
@@ -190,7 +272,7 @@ func insertWorker(ctx context.Context, id int, tripEventBatches <-chan []TripEve
 			if useBulkInsert {
 				insertQuery := bulkInsertEventSql(batch)
 				res, err := conn.Exec(ctx, insertQuery)
-				insertedInQuery -= batchSize - int(res.RowsAffected())
+				insertedInQuery += int(res.RowsAffected())
 				logger.Info("Bulk inserted trip events", "worker", id, "rowsAffected", res.RowsAffected(), "error", err)
 			} else {
 				// Use pgx batch for efficient batch inserts
@@ -213,17 +295,22 @@ func insertWorker(ctx context.Context, id int, tripEventBatches <-chan []TripEve
 			}
 
 			endTime := time.Now()
-			logger.Info("Worker finished batch insert",
-				"workerId", id,
-				"jobType", "batch_insert",
-				"batchSize", batchSize,
-				"useBulkInsert", useBulkInsert,
-				"startTime", startTime,
-				"endTime", endTime,
-				"insertTimeInMs", endTime.Sub(startTime).Milliseconds(),
-				"waitedForJobTimeInMs", waitedForJobTime.Milliseconds(),
-				"successfullyInserted", insertedInQuery,
-			)
+
+			// Send event to main thread for logging and CSV writing
+			event := InsertEvent{
+				WorkerID:             id,
+				JobType:              "batch_insert",
+				BatchSize:            batchSize,
+				UseBulkInsert:        useBulkInsert,
+				StartTime:            startTime.Format(time.RFC3339),
+				EndTime:              endTime.Format(time.RFC3339),
+				InsertDurationMs:     endTime.Sub(startTime).Milliseconds(),
+				WaitedForJobTimeMs:   waitedForJobTime.Milliseconds(),
+				SuccessfullyInserted: insertedInQuery,
+				FailedInserts:        batchSize - insertedInQuery,
+			}
+			eventCh <- event
+
 			insertedByWorker += insertedInQuery
 			failedInsertsByWorker += batchSize - insertedInQuery
 

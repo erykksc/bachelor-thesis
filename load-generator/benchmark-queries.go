@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"encoding/csv"
+	"fmt"
 	"io"
 	"math/rand"
 	"os"
@@ -17,7 +18,20 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-func benchmarkQueries(ctx context.Context, connString string, numWorkers int, dbTarget DBTarget, tripEventsCSV string, districts []District, pois []POI, queryTemplates *template.Template, numQueries int, seed int64) {
+type QueryEvent struct {
+	WorkerID           int
+	JobType            string
+	TemplateName       string
+	QueryDurationMs    int64
+	StartTime          string
+	EndTime            string
+	Successful         bool
+	ResultingRowsCount int
+	QueryIndex         int
+	ErrorMsg           string
+}
+
+func benchmarkQueries(ctx context.Context, connString string, numWorkers int, dbTarget DBTarget, tripEventsCSV string, districts []District, pois []POI, queryTemplates *template.Template, numQueries int, seed int64, csvWriter *csv.Writer) {
 	logger.Info("Starting Query Benchmark",
 		"dbConnString", connString,
 		"numWorkers", numWorkers,
@@ -44,15 +58,62 @@ func benchmarkQueries(ctx context.Context, connString string, numWorkers int, db
 	jobs := make(chan QueryJob, runtime.NumCPU()*100) // larger buffer to combat workers waiting for main thread to read the csv file
 	successCh := make(chan int, numWorkers)
 	failureCh := make(chan int, numWorkers)
+	eventCh := make(chan QueryEvent, numWorkers*10)
 	var wg sync.WaitGroup
 	for i := 1; i <= numWorkers; i++ {
 		wg.Add(1)
 		go func(id int) {
-			queryWorker(ctx, id, connString, queryTemplates, jobs, readyStatus, successCh, failureCh)
+			queryWorker(ctx, id, connString, queryTemplates, jobs, readyStatus, successCh, failureCh, eventCh)
 			wg.Done()
 		}(i)
 	}
 	logger.Info("Started query worker threads", "numWorkers", numWorkers)
+
+	// Write CSV header
+	csvHeader := []string{"workerId", "jobType", "templateName", "queryDurationMs", "startTime", "endTime", "successful", "resultingRowsCount", "queryIndex", "errorMsg"}
+	if err := csvWriter.Write(csvHeader); err != nil {
+		logger.Error("Failed to write CSV header", "error", err)
+		os.Exit(1)
+	}
+
+	// Start CSV writer goroutine
+	var csvWg sync.WaitGroup
+	csvWg.Add(1)
+	go func() {
+		defer csvWg.Done()
+		for event := range eventCh {
+			// Log the event (replacing worker logging)
+			logger.Info("Query worker finished query",
+				"workerId", event.WorkerID,
+				"jobType", event.JobType,
+				"templateName", event.TemplateName,
+				"queryDurationMs", event.QueryDurationMs,
+				"startTime", event.StartTime,
+				"endTime", event.EndTime,
+				"successful", event.Successful,
+				"resultingRowsCount", event.ResultingRowsCount,
+				"queryIndex", event.QueryIndex,
+				"error", event.ErrorMsg,
+			)
+
+			// Write to CSV
+			record := []string{
+				fmt.Sprintf("%d", event.WorkerID),
+				event.JobType,
+				event.TemplateName,
+				fmt.Sprintf("%d", event.QueryDurationMs),
+				event.StartTime,
+				event.EndTime,
+				fmt.Sprintf("%t", event.Successful),
+				fmt.Sprintf("%d", event.ResultingRowsCount),
+				fmt.Sprintf("%d", event.QueryIndex),
+				event.ErrorMsg,
+			}
+			if err := csvWriter.Write(record); err != nil {
+				logger.Error("Failed to write CSV record", "error", err)
+			}
+		}
+	}()
 
 	// Wait for all workers to signal ready
 	workersReady := 0
@@ -87,10 +148,18 @@ Waiting4Workers:
 			Fields:       fields,
 			TemplateName: randTmplName,
 		}
+
+		if i%1000 == 0 {
+			logger.Info("Query progress", "queriesAddedToQueue", i+1, "timeElapsedInSec", time.Since(startTime).Seconds())
+		}
 	}
 	close(jobs)
 	wg.Wait()
-	
+
+	// Close event channel and wait for CSV writer to finish
+	close(eventCh)
+	csvWg.Wait()
+
 	// Collect success and failure counts from all workers
 	totalSuccesses := 0
 	totalFailures := 0
@@ -100,7 +169,7 @@ Waiting4Workers:
 	}
 	close(successCh)
 	close(failureCh)
-	
+
 	endTime := time.Now()
 	if ctx.Err() == nil {
 		logger.Info("All query workers finished",
@@ -197,7 +266,7 @@ type QueryJob struct {
 }
 
 // queryWorker executes queries
-func queryWorker(ctx context.Context, id int, connString string, templates *template.Template, jobs <-chan QueryJob, readyStatus chan<- int, successCh chan<- int, failureCh chan<- int) {
+func queryWorker(ctx context.Context, id int, connString string, templates *template.Template, jobs <-chan QueryJob, readyStatus chan<- int, successCh chan<- int, failureCh chan<- int, eventCh chan<- QueryEvent) {
 	logger.Info("Query worker started", "id", id)
 
 	conn, err := pgx.Connect(ctx, connString)
@@ -285,18 +354,26 @@ func queryWorker(ctx context.Context, id int, connString string, templates *temp
 			endTime := time.Now()
 			queryDuration := endTime.Sub(startTime)
 
-			logger.Info("Query worker finished query",
-				"workerId", id,
-				"jobType", "query",
-				"templateName", job.TemplateName,
-				"queryDurationInMs", queryDuration.Milliseconds(),
-				"startTime", startTime,
-				"endTime", endTime,
-				"successful", querySuccessful,
-				"resultingRowsCount", resultingRowsCount,
-				"queryIndex", queryIndex,
-				"error", err,
-			)
+			// Prepare error message
+			var errorMsg string
+			if err != nil {
+				errorMsg = err.Error()
+			}
+
+			// Send event to main thread for logging and CSV writing
+			event := QueryEvent{
+				WorkerID:           id,
+				JobType:            "query",
+				TemplateName:       job.TemplateName,
+				QueryDurationMs:    queryDuration.Milliseconds(),
+				StartTime:          startTime.Format(time.RFC3339),
+				EndTime:            endTime.Format(time.RFC3339),
+				Successful:         querySuccessful,
+				ResultingRowsCount: resultingRowsCount,
+				QueryIndex:         queryIndex,
+				ErrorMsg:           errorMsg,
+			}
+			eventCh <- event
 		}
 	}
 }
