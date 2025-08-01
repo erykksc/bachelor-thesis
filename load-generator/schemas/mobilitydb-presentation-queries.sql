@@ -68,7 +68,7 @@ LIMIT 5;
 -- 14) Spatial range and intersection: which vehicle trips passed through Evere
 SELECT t.*
 FROM trips t
-JOIN districts d
+JOIN localities d
   ON tintersects(t.trip::tgeompoint, d.geo_shape) ?= true
 WHERE d.name ILIKE '%Charlottenburg%';
 
@@ -86,8 +86,8 @@ LIMIT 5;
 
 -- 16c) How many trips start and finish in different municipalities?
 SELECT COUNT(*)
-FROM trips T, districts S, districts E
-WHERE S.district_id <> E.district_id
+FROM trips T, localities S, localities E
+WHERE S.locality_id <> E.locality_id
   AND ST_Intersects(startValue(T.trip), S.geo_shape)
   AND ST_Intersects(endValue(T.trip), E.geo_shape)
   AND T.trip && tstzspan '[2021-01-01 00:00:00, 2021-02-01 00:00:00)';

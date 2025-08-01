@@ -31,7 +31,7 @@ type QueryEvent struct {
 	ErrorMsg           string
 }
 
-func benchmarkQueries(ctx context.Context, connString string, numWorkers int, dbTarget DBTarget, tripEventsCSV string, districts []District, pois []POI, queryTemplates *template.Template, numQueries int, seed int64, csvWriter *csv.Writer) {
+func benchmarkQueries(ctx context.Context, connString string, numWorkers int, dbTarget DBTarget, tripEventsCSV string, localities []Locality, pois []POI, queryTemplates *template.Template, numQueries int, seed int64, csvWriter *csv.Writer) {
 	logger.Info("Starting Query Benchmark",
 		"dbConnString", connString,
 		"numWorkers", numWorkers,
@@ -43,7 +43,7 @@ func benchmarkQueries(ctx context.Context, connString string, numWorkers int, db
 	tripIds := ReadTripIds(ctx, tripEventsCSV)
 
 	// Create field generator
-	generator := NewQueryFieldGenerator(seed, districts, pois, tripIds)
+	generator := NewQueryFieldGenerator(seed, localities, pois, tripIds)
 
 	queryTemplates = queryTemplates.Option("missingkey=error")
 	err := ValidateTemplates(ctx, queryTemplates, connString, generator)
@@ -383,9 +383,9 @@ type QueryFieldGenerator struct {
 	baseSeed int64
 
 	// Real data pools from loaded files
-	districts []District
-	pois      []POI
-	tripIDs   []string
+	localities []Locality
+	pois       []POI
+	tripIDs    []string
 
 	// Time bounds for realistic queries
 	minTime time.Time
@@ -394,7 +394,7 @@ type QueryFieldGenerator struct {
 
 // QueryFields contains all possible template parameters
 type QueryFields struct {
-	DistrictName string
+	LocalityName string
 	EndTime      string // RFC3339 string
 	Limit        int
 	POIID        string
@@ -405,7 +405,7 @@ type QueryFields struct {
 }
 
 // NewQueryFieldGenerator creates a new seeded field generator
-func NewQueryFieldGenerator(seed int64, districts []District, pois []POI, tripIds []string) *QueryFieldGenerator {
+func NewQueryFieldGenerator(seed int64, localities []Locality, pois []POI, tripIds []string) *QueryFieldGenerator {
 	// Load Berlin time zone
 	berlinLoc, err := time.LoadLocation("Europe/Berlin")
 	if err != nil {
@@ -417,12 +417,12 @@ func NewQueryFieldGenerator(seed int64, districts []District, pois []POI, tripId
 	maxTime := time.Date(2025, 12, 31, 23, 59, 59, 0, berlinLoc)
 
 	return &QueryFieldGenerator{
-		baseSeed:  seed,
-		districts: districts,
-		pois:      pois,
-		tripIDs:   tripIds,
-		minTime:   minTime,
-		maxTime:   maxTime,
+		baseSeed:   seed,
+		localities: localities,
+		pois:       pois,
+		tripIDs:    tripIds,
+		minTime:    minTime,
+		maxTime:    maxTime,
 	}
 }
 
@@ -455,7 +455,7 @@ func (g *QueryFieldGenerator) GenerateFields(queryIndex int) QueryFields {
 	timestamp := time.Unix(g.minTime.Unix()+timestampOffset, 0)
 
 	return QueryFields{
-		DistrictName: g.districts[rng.Intn(len(g.districts))].Name,
+		LocalityName: g.localities[rng.Intn(len(g.localities))].Name,
 		Limit:        5 + rng.Intn(100), // 5-100
 		POIID:        g.pois[rng.Intn(len(g.pois))].POIID,
 		Radius:       1000 + rng.Float64()*4000, // 1000-5000 meters

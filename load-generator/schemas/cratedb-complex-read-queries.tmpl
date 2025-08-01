@@ -16,19 +16,19 @@ GROUP BY start_poi.poi_id, end_poi.poi_id
 ORDER BY trip_count DESC
 {{end}}
 
-{{define "EventDensityHeatmapPerDistrict"}}
-SELECT d.name AS district,
+{{define "EventDensityHeatmapPerLocality"}}
+SELECT d.name AS locality,
        DATE_BIN(INTERVAL '1 hour', e.timestamp, TIMESTAMP '2000-01-01 00:00:00+00:00') AS hour,
        COUNT(*) AS event_count
 FROM escooter_events e
-JOIN districts d ON within(e.geo_point, d.geo_shape)
+JOIN localities d ON within(e.geo_point, d.geo_shape)
 WHERE e.timestamp BETWEEN '{{.StartTime}}' AND '{{.EndTime}}'
 GROUP BY d.name, hour
 ORDER BY d.name, hour
 {{end}}
 
-{{define "TripDurationsPerDistrict"}}
-SELECT d.name AS district,
+{{define "TripDurationsPerLocality"}}
+SELECT d.name AS locality,
        AVG(duration_secs) AS avg_duration_secs
 FROM (
   SELECT trip_id,
@@ -39,7 +39,7 @@ FROM (
   HAVING EXTRACT(EPOCH FROM (MAX(timestamp) - MIN(timestamp))) > 60
 ) trip_durations
 JOIN escooter_events e ON e.trip_id = trip_durations.trip_id
-JOIN districts d ON within(e.geo_point, d.geo_shape)
+JOIN localities d ON within(e.geo_point, d.geo_shape)
 WHERE e.timestamp BETWEEN '{{.StartTime}}' AND '{{.EndTime}}'
 GROUP BY d.name
 ORDER BY avg_duration_secs DESC
@@ -68,20 +68,20 @@ FROM (
 ) trips
 JOIN escooter_events e_start ON e_start.trip_id = trips.trip_id AND e_start.timestamp = trips.start_time
 JOIN escooter_events e_end ON e_end.trip_id = trips.trip_id AND e_end.timestamp = trips.end_time
-JOIN districts d_start ON within(e_start.geo_point, d_start.geo_shape)
-JOIN districts d_end ON within(e_end.geo_point, d_end.geo_shape)
+JOIN localities d_start ON within(e_start.geo_point, d_start.geo_shape)
+JOIN localities d_end ON within(e_end.geo_point, d_end.geo_shape)
 GROUP BY d_start.name, d_end.name
 ORDER BY trip_count DESC
 {{end}}
 
-{{define "CountEventsInDistrictPerHour"}}
+{{define "CountEventsInLocalityPerHour"}}
 SELECT
     DATE_BIN(INTERVAL '1 hour', e.timestamp, TIMESTAMP '2000-01-01 00:00:00+00:00') AS hour,
     COUNT(*) AS event_count
 FROM escooter_events e
-JOIN districts d
+JOIN localities d
   ON within(e.geo_point, d.geo_shape)
-WHERE d.name = '{{.DistrictName}}'
+WHERE d.name = '{{.LocalityName}}'
   AND e.timestamp BETWEEN '{{.StartTime}}' AND '{{.EndTime}}'
 GROUP BY hour
 ORDER BY hour

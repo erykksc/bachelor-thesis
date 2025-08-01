@@ -7,27 +7,27 @@ import os
 # Ensure output folder exists
 os.makedirs("output", exist_ok=True)
 
-# 1. Download Berlin districts (admin level 9)
+# 1. Download Berlin localities (admin level 9)
 
-tags_districts = {"boundary": "administrative", "admin_level": "9"}
+tags_localities = {"boundary": "administrative", "admin_level": "9"}
 
 # Note: features_from_place returns a GeoDataFrame
-districts = ox.features_from_place("Berlin, Germany", tags=tags_districts)
+localities = ox.features_from_place("Berlin, Germany", tags=tags_localities)
 
 # Keep only polygons/multipolygons
-districts = districts[districts.geometry.type.isin(["Polygon", "MultiPolygon"])]
+localities = localities[localities.geometry.type.isin(["Polygon", "MultiPolygon"])]
 
 # Add UUIDs
-districts["district_id"] = [str(uuid.uuid4()) for _ in range(len(districts))]
-districts["name"] = districts["name"].fillna("UNKNOWN")
+localities["locality_id"] = [str(uuid.uuid4()) for _ in range(len(localities))]
+localities["name"] = localities["name"].fillna("UNKNOWN")
 
 # Select columns to export
-districts_export = districts[["district_id", "name", "geometry"]]
+localities_export = localities[["locality_id", "name", "geometry"]]
 
 # Export to GeoJSON
-districts_export.to_file("output/berlin_districts.geojson", driver="GeoJSON")
+localities_export.to_file("output/berlin-localities.geojson", driver="GeoJSON")
 
-print(f"Exported {len(districts_export)} districts to output/berlin_districts.geojson")
+print(f"Exported {len(localities_export)} localities to output/berlin_localities.geojson")
 
 # 2. Download Points of Interest (POIs)
 

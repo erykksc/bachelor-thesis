@@ -26,18 +26,18 @@ ORDER BY trip_count DESC
 LIMIT {{.Limit}};
 {{end}}
 
-{{define "EventDensityHeatmapPerDistrict"}}
-SELECT d.name AS district,
+{{define "EventDensityHeatmapPerLocality"}}
+SELECT d.name AS locality,
        date_trunc('hour', e.timestamp) AS hour,
        COUNT(*) AS event_count
 FROM escooter_events e
-JOIN districts d ON ST_Within(e.geo_point::geometry, d.geo_shape::geometry)
+JOIN localities d ON ST_Within(e.geo_point::geometry, d.geo_shape::geometry)
 WHERE e.timestamp BETWEEN '{{.StartTime}}' AND '{{.EndTime}}'
 GROUP BY d.name, hour
 ORDER BY d.name, hour;
 {{end}}
 
-{{define "TripDurationsPerDistrict"}}
+{{define "TripDurationsPerLocality"}}
 WITH trip_durations AS (
   SELECT trip_id,
          EXTRACT(EPOCH FROM MAX(timestamp) - MIN(timestamp)) AS duration_secs
@@ -46,11 +46,11 @@ WITH trip_durations AS (
   GROUP BY trip_id
   HAVING EXTRACT(EPOCH FROM MAX(timestamp) - MIN(timestamp)) > 60
 )
-SELECT d.name AS district,
+SELECT d.name AS locality,
        AVG(td.duration_secs) AS avg_duration_secs
 FROM trip_durations td
 JOIN escooter_events e ON e.trip_id = td.trip_id
-JOIN districts d ON ST_Within(e.geo_point::geometry, d.geo_shape::geometry)
+JOIN localities d ON ST_Within(e.geo_point::geometry, d.geo_shape::geometry)
 WHERE e.timestamp BETWEEN '{{.StartTime}}' AND '{{.EndTime}}'
 GROUP BY d.name
 ORDER BY avg_duration_secs DESC;
@@ -87,8 +87,8 @@ SELECT d_start.name AS origin,
        d_end.name AS destination,
        COUNT(*) AS trip_count
 FROM start_end_events see
-JOIN districts d_start ON ST_Within(see.start_point::geometry, d_start.geo_shape::geometry)
-JOIN districts d_end ON ST_Within(see.end_point::geometry, d_end.geo_shape::geometry)
+JOIN localities d_start ON ST_Within(see.start_point::geometry, d_start.geo_shape::geometry)
+JOIN localities d_end ON ST_Within(see.end_point::geometry, d_end.geo_shape::geometry)
 GROUP BY d_start.name, d_end.name
 ORDER BY trip_count DESC
 LIMIT {{.Limit}};

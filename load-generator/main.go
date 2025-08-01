@@ -27,14 +27,14 @@ type POI struct {
 	Latitude  string
 }
 
-type District struct {
-	DistrictID string          `json:"district_id"`
+type Locality struct {
+	LocalityID string          `json:"locality_id"`
 	Name       string          `json:"name"`
 	Geometry   json.RawMessage `json:"geometry"`
 }
 
-func (d District) String() string {
-	return fmt.Sprintf("District(DistrictID=%s, Name=%s, len(Geometry)=%d)", d.DistrictID, d.Name, len(d.Geometry))
+func (d Locality) String() string {
+	return fmt.Sprintf("Locality(LocalityID=%s, Name=%s, len(Geometry)=%d)", d.LocalityID, d.Name, len(d.Geometry))
 }
 
 // not parsed to correct data types to increase performance
@@ -75,7 +75,7 @@ func main() {
 	var (
 		dbTargetStr     = flag.String("dbTarget", "cratedb", "Target database: cratedb or mobilitydbc")
 		connString      = flag.String("db", "postgresql://crate:crate@localhost:5432/doc", "Connection string to use to connect to db")
-		districtsPath   = flag.String("districts", "../dataset-generator/output/berlin-districts.geojson", "Path to a file containing districts")
+		localitiesPath  = flag.String("localities", "../dataset-generator/output/berlin-localities.geojson", "Path to a file containing localities")
 		poisPath        = flag.String("pois", "../dataset-generator/output/berlin-pois.csv", "Path to a file containing POIs")
 		tripsPath       = flag.String("trips", "../dataset-generator/output/escooter-trips-small.csv", "Path to a CSV file containing the escooter trip events")
 		migrationsDir   = flag.String("migrations", "./migrations", "Directory containing migration files")
@@ -103,7 +103,7 @@ func main() {
 
 	logger.Info("Starting load-generator with following cli arguments",
 		"db", dbTargetStr,
-		"districts", districtsPath,
+		"localities", localitiesPath,
 		"pois", poisPath,
 		"trips", tripsPath,
 		"migrations", migrationsDir,
@@ -127,16 +127,16 @@ func main() {
 		os.Exit(1)
 	}
 
-	districts := mustLoadDistricts(*districtsPath)
-	logger.Info("Loaded and parsed districts", "count", len(districts))
+	localities := mustLoadLocalities(*localitiesPath)
+	logger.Info("Loaded and parsed localities", "count", len(localities))
 
 	pois := mustLoadPOIs(*poisPath)
 	logger.Info("Loaded and parsed pois", "count", len(pois))
 
 	switch *mode {
 	case "init":
-		// initialize tables and insert POIs and Districts
-		mustInitializeDb(ctx, *connString, dbTarget, pois, districts, *migrationsDir)
+		// initialize tables and insert POIs and Localities
+		mustInitializeDb(ctx, *connString, dbTarget, pois, localities, *migrationsDir)
 
 	case "insert":
 		csvFile := createInsertCSVFile(dbTarget, *numWorkers, *batchSize, *useBulkInsert, *tripsPath)
@@ -155,7 +155,7 @@ func main() {
 		csvWriter := csv.NewWriter(csvFile)
 		defer csvWriter.Flush()
 
-		benchmarkQueries(ctx, *connString, *numWorkers, dbTarget, *tripEventsCSV, districts, pois, queryTemplates, *numQueries, *randomSeed, csvWriter)
+		benchmarkQueries(ctx, *connString, *numWorkers, dbTarget, *tripEventsCSV, localities, pois, queryTemplates, *numQueries, *randomSeed, csvWriter)
 
 	default:
 		logger.Error("unknown mode", "mode", *mode)
@@ -198,7 +198,7 @@ func mustLoadPOIs(path string) []POI {
 	return pois
 }
 
-func mustLoadDistricts(path string) []District {
+func mustLoadLocalities(path string) []Locality {
 	b, err := os.ReadFile(path)
 	if err != nil {
 		logger.Error("Error in read geojson", "error", err)
@@ -215,16 +215,16 @@ func mustLoadDistricts(path string) []District {
 		logger.Error("Error in parse geojson", "error", err)
 		os.Exit(1)
 	}
-	var districts []District
+	var localities []Locality
 	for _, feat := range fc.Features {
-		d := District{
-			DistrictID: feat.Properties["district_id"].(string),
+		d := Locality{
+			LocalityID: feat.Properties["locality_id"].(string),
 			Name:       feat.Properties["name"].(string),
 			Geometry:   feat.Geometry,
 		}
-		districts = append(districts, d)
+		localities = append(localities, d)
 	}
-	return districts
+	return localities
 }
 
 func mustLoadTemplates(templatesFilepath string) *template.Template {

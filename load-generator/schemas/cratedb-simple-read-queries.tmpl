@@ -31,9 +31,9 @@ LIMIT {{.Limit}};
 {{define "EscootersInDistricsInTimeRange"}}
 SELECT e.*
 FROM escooter_events e
-JOIN districts d
+JOIN localities d
   ON within(e.geo_point, d.geo_shape)
-WHERE d.name = '{{.DistrictName}}'
+WHERE d.name = '{{.LocalityName}}'
   AND e.timestamp BETWEEN '{{.StartTime}}' AND '{{.EndTime}}';
 {{end}}
 
@@ -46,12 +46,12 @@ WHERE p.poi_id = '{{.POIID}}'
   AND e.timestamp BETWEEN '{{.StartTime}}' AND '{{.EndTime}}';
 {{end}}
 
-{{define "EscootersAtTimeInDistrict"}}
+{{define "EscootersAtTimeInLocality"}}
 SELECT DISTINCT e.trip_id
 FROM escooter_events e
-JOIN districts d
+JOIN localities d
   ON within(e.geo_point, d.geo_shape)
-WHERE d.name = '{{.DistrictName}}'
+WHERE d.name = '{{.LocalityName}}'
   AND e.timestamp = '{{.Timestamp}}';
 {{end}}
 

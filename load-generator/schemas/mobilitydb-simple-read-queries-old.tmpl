@@ -22,9 +22,9 @@ LIMIT {{.Limit}};
 {{define "EscootersInDistricsInTimeRange"}}
 SELECT e.*
 FROM escooter_events e
-JOIN districts d
+JOIN localities d
   ON ST_Within(trajectory(e.tgeo_point)::geometry, d.geo_shape)
-WHERE d.name = '{{.DistrictName}}'
+WHERE d.name = '{{.LocalityName}}'
   AND e.tgeo_point && tstzspan '[{{.StartTime}}, {{.EndTime}}]';
 {{end}}
 
@@ -37,12 +37,12 @@ WHERE p.poi_id = '{{.POIID}}'
   AND e.tgeo_point && tstzspan '[{{.StartTime}}, {{.EndTime}}]';
 {{end}}
 
-{{define "EscootersAtTimeInDistrict"}}
+{{define "EscootersAtTimeInLocality"}}
 SELECT DISTINCT e.trip_id
 FROM escooter_events e
-JOIN districts d
+JOIN localities d
   ON ST_Within(getValue(atTime(e.tgeo_point, timestamptz '{{.Timestamp}}'))::geometry, d.geo_shape)
-WHERE d.name = '{{.DistrictName}}'
+WHERE d.name = '{{.LocalityName}}'
   AND e.tgeo_point @ timestamptz '{{.Timestamp}}';
 {{end}}
 
@@ -66,12 +66,12 @@ JOIN pois p
 WHERE p.poi_id = '{{.POIID}}';
 {{end}}
 
-{{define "CountEventsInDistrictPerHour"}}
+{{define "CountEventsInLocalityPerHour"}}
 SELECT COUNT(*) AS event_count
 FROM escooter_events e
-JOIN districts d
+JOIN localities d
   ON ST_Within(trajectory(e.tgeo_point)::geometry, d.geo_shape)
-WHERE d.name = '{{.DistrictName}}';
+WHERE d.name = '{{.LocalityName}}';
 {{end}}
 
 {{define "EscootersWithPOIsInRadiusOfEachOther"}}

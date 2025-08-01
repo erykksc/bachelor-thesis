@@ -1,6 +1,6 @@
 DROP TABLE IF EXISTS escooter_events;
 DROP TABLE IF EXISTS pois;
-DROP TABLE IF EXISTS districts;
+DROP TABLE IF EXISTS localities;
 
 CREATE TABLE IF NOT EXISTS escooter_events (
     event_id  UUID PRIMARY KEY,
@@ -27,19 +27,19 @@ CREATE TABLE IF NOT EXISTS pois (
 CREATE INDEX IF NOT EXISTS pois_geo_point_gist        ON pois      USING GIST (geo_point);
 CREATE INDEX IF NOT EXISTS pois_geo_point_spgist      ON pois      USING SPGIST (geo_point);
 
-CREATE TABLE IF NOT EXISTS districts (
-    district_id UUID PRIMARY KEY,
+CREATE TABLE IF NOT EXISTS localities (
+    locality_id UUID PRIMARY KEY,
     name        TEXT,
     geo_shape   geometry(MultiPolygon, 4326)
 );
 
 
-CREATE INDEX IF NOT EXISTS districts_geo_shape_gist   ON districts USING GIST (geo_shape);
-CREATE INDEX IF NOT EXISTS districts_geo_shape_spgist ON districts USING SPGIST (geo_shape);
+CREATE INDEX IF NOT EXISTS localities_geo_shape_gist   ON localities USING GIST (geo_shape);
+CREATE INDEX IF NOT EXISTS localities_geo_shape_spgist ON localities USING SPGIST (geo_shape);
 
 -- Replicate small tables to every worker (fast local joins, no broadcast)
 SELECT create_reference_table('pois');
-SELECT create_reference_table('districts');
+SELECT create_reference_table('localities');
 
 -- Distribute by trip_id (hash), keep rows of same trip together
 SELECT create_distributed_table(

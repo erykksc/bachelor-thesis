@@ -12,8 +12,8 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-func mustInitializeDb(ctx context.Context, connString string, dbTarget DBTarget, pois []POI, districts []District, migrationsDir string) {
-	logger.Info("Initializing Database", "databaseType", dbTarget.String(), "connString", connString, "poiCount", len(pois), "districtCount", len(districts))
+func mustInitializeDb(ctx context.Context, connString string, dbTarget DBTarget, pois []POI, localities []Locality, migrationsDir string) {
+	logger.Info("Initializing Database", "databaseType", dbTarget.String(), "connString", connString, "poiCount", len(pois), "localityCount", len(localities))
 
 	// Initialize database connection
 	conn, err := pgx.Connect(ctx, connString)
@@ -66,33 +66,33 @@ func mustInitializeDb(ctx context.Context, connString string, dbTarget DBTarget,
 	}
 	logger.Info("Inserted all POIs into database", "dbTarget", dbTarget.String(), "poiCount", len(pois), "timeElapsedInSec", time.Since(startTime).Seconds())
 
-	// Insert districts
+	// Insert localities
 
 	// Choose Database specific insert methods
-	queueDistrictInsert := queueDistrictInsertToCratedb
+	queueLocalityInsert := queueLocalityInsertToCratedb
 	switch dbTarget {
 	case CrateDB:
-		queueDistrictInsert = queueDistrictInsertToCratedb
+		queueLocalityInsert = queueLocalityInsertToCratedb
 	case MobilityDB:
-		queueDistrictInsert = queueDistrictInsertToMobilitydb
+		queueLocalityInsert = queueLocalityInsertToMobilitydb
 	}
 
 	startTime = time.Now()
 	pgxBatch := &pgx.Batch{}
-	for _, district := range districts {
-		queueDistrictInsert(pgxBatch, &district)
+	for _, locality := range localities {
+		queueLocalityInsert(pgxBatch, &locality)
 	}
 	batchResults := conn.SendBatch(ctx, pgxBatch)
 	defer batchResults.Close()
-	for _, district := range districts {
+	for _, locality := range localities {
 		_, err := batchResults.Exec()
 		if err != nil {
-			logger.Error("Error executing district insert query", "error", err, "districtData", district.String())
+			logger.Error("Error executing locality insert query", "error", err, "localityData", locality.String())
 			os.Exit(1)
 		}
 	}
 	batchResults.Close()
-	logger.Info("Inserted all districts into database", "dbTarget", dbTarget.String(), "districtCount", len(districts), "timeElapsedInSec", time.Since(startTime).Seconds())
+	logger.Info("Inserted all localities into database", "dbTarget", dbTarget.String(), "localityCount", len(localities), "timeElapsedInSec", time.Since(startTime).Seconds())
 }
 
 func insertPoisToCratedb(ctx context.Context, conn *pgx.Conn, pois []POI) error {
@@ -169,17 +169,17 @@ func insertPoisToMobilitydb(ctx context.Context, conn *pgx.Conn, pois []POI) err
 	return err
 }
 
-func queueDistrictInsertToCratedb(batch *pgx.Batch, district *District) *pgx.QueuedQuery {
+func queueLocalityInsertToCratedb(batch *pgx.Batch, locality *Locality) *pgx.QueuedQuery {
 	return batch.Queue(
-		`INSERT INTO districts( district_id, name, geo_shape)
+		`INSERT INTO localities( locality_id, name, geo_shape)
 		VALUES ( $1, $2, $3);`,
-		district.DistrictID, district.Name, district.Geometry,
+		locality.LocalityID, locality.Name, locality.Geometry,
 	)
 }
 
-func queueDistrictInsertToMobilitydb(batch *pgx.Batch, district *District) *pgx.QueuedQuery {
+func queueLocalityInsertToMobilitydb(batch *pgx.Batch, locality *Locality) *pgx.QueuedQuery {
 	return batch.Queue(
-		`INSERT INTO districts ( district_id, name, geo_shape)
+		`INSERT INTO localities ( locality_id, name, geo_shape)
 		VALUES ( $1, $2, ST_GeomFromGeoJSON($3));`,
-		district.DistrictID, district.Name, district.Geometry)
+		locality.LocalityID, locality.Name, locality.Geometry)
 }

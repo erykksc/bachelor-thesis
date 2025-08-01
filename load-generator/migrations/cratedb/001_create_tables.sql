@@ -1,6 +1,6 @@
 DROP TABLE IF EXISTS escooter_events;
 DROP TABLE IF EXISTS pois;
-DROP TABLE IF EXISTS districts;
+DROP TABLE IF EXISTS localities;
 
 CREATE TABLE IF NOT EXISTS escooter_events (
     event_id    TEXT,
@@ -21,8 +21,8 @@ CREATE TABLE IF NOT EXISTS pois (
 CLUSTERED INTO 1 SHARDS
 WITH ("number_of_replicas" = '0-all');
 
-CREATE TABLE IF NOT EXISTS districts (
-    district_id TEXT PRIMARY KEY,
+CREATE TABLE IF NOT EXISTS localities (
+    locality_id TEXT PRIMARY KEY,
     name        TEXT,
     geo_shape   GEO_SHAPE
 )
