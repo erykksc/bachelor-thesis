@@ -22,6 +22,8 @@
             pkgs.gnumake
             pkgs.go
             pkgs.golangci-lint
+            pkgs.ijq
+            pkgs.jq
             pkgs.kubectl
             pkgs.kubernetes-helm
             pkgs.nixfmt-rfc-style
