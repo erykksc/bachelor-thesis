@@ -40,16 +40,33 @@ func benchmarkQueries(ctx context.Context, connString string, numWorkers int, db
 	logger.Info("Using query templates", "count", len(queryTemplates.Templates()))
 
 	// Start workers
+	readyStatus := make(chan int, numWorkers)
 	jobs := make(chan QueryJob, runtime.NumCPU()*100) // larger buffer to combat workers waiting for main thread to read the csv file
 	var wg sync.WaitGroup
 	for i := 1; i <= numWorkers; i++ {
 		wg.Add(1)
 		go func(id int) {
-			queryWorker(ctx, id, connString, queryTemplates, jobs)
+			queryWorker(ctx, id, connString, queryTemplates, jobs, readyStatus)
 			wg.Done()
 		}(i)
 	}
 	logger.Info("Started query worker threads", "numWorkers", numWorkers)
+
+	// Wait for all workers to signal ready
+	workersReady := 0
+Waiting4Workers:
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case readyWorkerId := <-readyStatus:
+			logger.Info("Worker reported ready", "id", readyWorkerId)
+			workersReady += 1
+			if workersReady == numWorkers {
+				break Waiting4Workers
+			}
+		}
+	}
 
 	templateNames := make([]string, len(queryTemplates.Templates()))
 	for i, tmpl := range queryTemplates.Templates() {
@@ -59,6 +76,9 @@ func benchmarkQueries(ctx context.Context, connString string, numWorkers int, db
 	// Wait for all workers to complete
 	startTime := time.Now()
 	for i := range numQueries {
+		if ctx.Err() != nil {
+			break
+		}
 		fields := generator.GenerateFields(i)
 		randTmplName := templateNames[i%len(templateNames)]
 		jobs <- QueryJob{
@@ -162,7 +182,7 @@ type QueryJob struct {
 }
 
 // queryWorker executes queries
-func queryWorker(ctx context.Context, id int, connString string, templates *template.Template, jobs <-chan QueryJob) {
+func queryWorker(ctx context.Context, id int, connString string, templates *template.Template, jobs <-chan QueryJob, readyStatus chan<- int) {
 	logger.Info("Query worker started", "id", id)
 
 	conn, err := pgx.Connect(ctx, connString)
@@ -176,6 +196,8 @@ func queryWorker(ctx context.Context, id int, connString string, templates *temp
 	queryIndex := -1
 	successfulQueries := 0
 	failedQueries := 0
+
+	readyStatus <- id
 
 	defer func() {
 		logger.Info(
@@ -254,6 +276,7 @@ func queryWorker(ctx context.Context, id int, connString string, templates *temp
 				"startTime", startTime,
 				"endTime", endTime,
 				"successful", querySuccessful,
+				"resultingRowsCount", resultingRowsCount,
 				"queryIndex", queryIndex,
 				"error", err,
 			)
@@ -289,9 +312,15 @@ type QueryFields struct {
 
 // NewQueryFieldGenerator creates a new seeded field generator
 func NewQueryFieldGenerator(seed int64, districts []District, pois []POI, tripIds []string) *QueryFieldGenerator {
+	// Load Berlin time zone
+	berlinLoc, err := time.LoadLocation("Europe/Berlin")
+	if err != nil {
+		panic("Failed to load Europe/Berlin timezone: " + err.Error())
+	}
+
 	// Set realistic time bounds (adjust based on your dataset)
-	minTime := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
-	maxTime := time.Date(2025, 12, 31, 23, 59, 59, 0, time.UTC)
+	minTime := time.Date(2020, 1, 1, 0, 0, 0, 0, berlinLoc)
+	maxTime := time.Date(2025, 12, 31, 23, 59, 59, 0, berlinLoc)
 
 	return &QueryFieldGenerator{
 		baseSeed:  seed,
@@ -333,11 +362,11 @@ func (g *QueryFieldGenerator) GenerateFields(queryIndex int) QueryFields {
 
 	return QueryFields{
 		DistrictName: g.districts[rng.Intn(len(g.districts))].Name,
-		EndTime:      endTime.Format(time.RFC3339),
-		Limit:        1 + rng.Intn(100), // 1-100
+		Limit:        5 + rng.Intn(100), // 5-100
 		POIID:        g.pois[rng.Intn(len(g.pois))].POIID,
-		Radius:       50.0 + rng.Float64()*1950.0, // 50-2000 meters
+		Radius:       1000 + rng.Float64()*4000, // 1000-5000 meters
 		StartTime:    startTime.Format(time.RFC3339),
+		EndTime:      endTime.Format(time.RFC3339),
 		Timestamp:    timestamp.Format(time.RFC3339),
 		TripID:       g.tripIDs[rng.Intn(len(g.tripIDs))],
 	}

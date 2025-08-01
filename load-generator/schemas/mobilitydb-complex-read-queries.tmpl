@@ -1,95 +1,18 @@
-{{define "MostFrequentPOIToPOITrips"}}
-WITH trip_bounds AS (
-  SELECT trip_id,
-         MIN(timestamp) AS start_time,
-         MAX(timestamp) AS end_time
-  FROM escooter_events
-  WHERE timestamp BETWEEN '{{.StartTime}}' AND '{{.EndTime}}'
-  GROUP BY trip_id
-),
-start_end_events AS (
-  SELECT tb.trip_id,
-         e_start.geo_point AS start_point,
-         e_end.geo_point AS end_point
-  FROM trip_bounds tb
-  JOIN escooter_events e_start ON e_start.trip_id = tb.trip_id AND e_start.timestamp = tb.start_time
-  JOIN escooter_events e_end ON e_end.trip_id = tb.trip_id AND e_end.timestamp = tb.end_time
-)
-SELECT p_start.poi_id AS start_poi,
-       p_end.poi_id AS end_poi,
-       COUNT(*) AS trip_count
-FROM start_end_events see
-JOIN pois p_start ON ST_DWithin(p_start.geo_point::geometry, see.start_point::geometry, {{.Radius}})
-JOIN pois p_end ON ST_DWithin(p_end.geo_point::geometry, see.end_point::geometry, {{.Radius}})
-GROUP BY p_start.poi_id, p_end.poi_id
-ORDER BY trip_count DESC
-LIMIT {{.Limit}};
-{{end}}
+-- What is the time span of the whole dataset?
+SELECT MIN(startTimestamp(trip)) AS begin, MAX(endTimestamp(trip)) AS end
+FROM trips;
 
-{{define "EventDensityHeatmapPerDistrict"}}
-SELECT d.name AS district,
-       date_trunc('hour', e.timestamp) AS hour,
-       COUNT(*) AS event_count
-FROM escooter_events e
-JOIN districts d ON ST_Within(e.geo_point::geometry, d.geo_shape::geometry)
-WHERE e.timestamp BETWEEN '{{.StartTime}}' AND '{{.EndTime}}'
-GROUP BY d.name, hour
-ORDER BY d.name, hour;
-{{end}}
-
-{{define "TripDurationsPerDistrict"}}
-WITH trip_durations AS (
-  SELECT trip_id,
-         EXTRACT(EPOCH FROM MAX(timestamp) - MIN(timestamp)) AS duration_secs
-  FROM escooter_events
-  WHERE timestamp BETWEEN '{{.StartTime}}' AND '{{.EndTime}}'
-  GROUP BY trip_id
-  HAVING EXTRACT(EPOCH FROM MAX(timestamp) - MIN(timestamp)) > 60
-)
-SELECT d.name AS district,
-       AVG(td.duration_secs) AS avg_duration_secs
-FROM trip_durations td
-JOIN escooter_events e ON e.trip_id = td.trip_id
-JOIN districts d ON ST_Within(e.geo_point::geometry, d.geo_shape::geometry)
-WHERE e.timestamp BETWEEN '{{.StartTime}}' AND '{{.EndTime}}'
-GROUP BY d.name
-ORDER BY avg_duration_secs DESC;
-{{end}}
-
-{{define "MostVisitedPOIs"}}
-SELECT p.poi_id, p.name, COUNT(*) AS visits
-FROM escooter_events e
-JOIN pois p ON ST_DWithin(p.geo_point::geometry, e.geo_point::geometry, {{.Radius}})
-WHERE e.timestamp BETWEEN '{{.StartTime}}' AND '{{.EndTime}}'
-GROUP BY p.poi_id, p.name
-ORDER BY visits DESC
-LIMIT {{.Limit}};
-{{end}}
-
-{{define "OriginDestinationMatrix"}}
-WITH trip_bounds AS (
-  SELECT trip_id,
-         MIN(timestamp) AS start_time,
-         MAX(timestamp) AS end_time
-  FROM escooter_events
-  WHERE timestamp BETWEEN '{{.StartTime}}' AND '{{.EndTime}}'
-  GROUP BY trip_id
-),
-start_end_events AS (
-  SELECT tb.trip_id,
-         e_start.geo_point AS start_point,
-         e_end.geo_point AS end_point
-  FROM trip_bounds tb
-  JOIN escooter_events e_start ON e_start.trip_id = tb.trip_id AND e_start.timestamp = tb.start_time
-  JOIN escooter_events e_end ON e_end.trip_id = tb.trip_id AND e_end.timestamp = tb.end_time
-)
-SELECT d_start.name AS origin,
-       d_end.name AS destination,
-       COUNT(*) AS trip_count
-FROM start_end_events see
-JOIN districts d_start ON ST_Within(see.start_point::geometry, d_start.geo_shape::geometry)
-JOIN districts d_end ON ST_Within(see.end_point::geometry, d_end.geo_shape::geometry)
-GROUP BY d_start.name, d_end.name
-ORDER BY trip_count DESC
-LIMIT {{.Limit}};
+-- Data summaries
+define{{"DataSummaries"}}
+SELECT 
+    MIN(length(trip)) AS minLength,
+    MAX(length(trip)) AS maxLength,
+    AVG(length(trip)) AS avgLength,
+    MIN(duration(trip)) AS minDuration,
+    MAX(duration(trip)) AS maxDuration,
+    AVG(duration(trip)) AS avgDuration,
+    MIN(numInstants(trip)) AS minPoints,
+    MAX(numInstants(trip)) AS maxPoints,
+    AVG(numInstants(trip)) AS avgPoints,
+FROM trips;
 {{end}}

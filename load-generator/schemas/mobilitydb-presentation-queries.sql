@@ -78,7 +78,7 @@ FROM trips, pois
 WHERE name = 'Grand Place - Grote Markt';
 
 -- 16b) Five closest trips to 'Grand Place - Grote Markt'
-SELECT t.*, t.trip |=| p.geo_point AS distance
+SELECT t.trip_id, t.trip |=| p.geo_point AS distance
 FROM trips t, pois p
 WHERE p.name = 'Charlottenburg'
 ORDER BY distance ASC

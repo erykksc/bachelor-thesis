@@ -1,83 +1,74 @@
-{{define "TripLength"}}
-SELECT ST_Length(trajectory(tgeo_point)) AS trip_length_m
-FROM escooter_events
-WHERE trip_id = '{{.TripID}}'
-LIMIT 1;
+-- Trip events
+{{define "GetTripEvents"}}
+SELECT unnest(instants(trip)) AS instant
+FROM trips
+WHERE trip_id = '{{.TripID}}';
 {{end}}
 
-{{define "EscooterTraceByTripID"}}
-SELECT *
-FROM escooter_events
-WHERE trip_id = '{{.TripID}}'
-ORDER BY timestamp;
+
+-- Start and end timestamp of a trip
+{{define "TripFirstAndLastEvent"}}
+SELECT startTimestamp(trip) AS start, endTimestamp(trip) AS end
+FROM trips
+WHERE trip_id = '{{.TripID}}';
 {{end}}
 
-{{define "LastKnownLocationPerTrip"}}
-SELECT DISTINCT trip_id, 
-       tgeo_point AS last_location
-FROM escooter_events
-LIMIT {{.Limit}};
+
+-- Length of a trip
+{{define "LengthOfTrip"}}
+SELECT length(trip) AS tripLengthInMeters
+FROM trips
+WHERE trip_id = '{{.TripID}}';
 {{end}}
 
-{{define "EscootersInDistricsInTimeRange"}}
-SELECT e.*
-FROM escooter_events e
+
+-- Average speed of trip in Km/h
+{{define "AverageSpeedOfTrip"}}
+SELECT twAvg(speed(trip)) * 3.6 AS avgSpeedInKmh
+FROM trips
+WHERE trip_id = '{{.TripID}}';
+{{end}}
+
+
+-- POIs in radius of the trip
+{{define "PoisWithinRadiusDuringTrip"}}
+SELECT DISTINCT p.*
+FROM trips t
+JOIN pois p
+  ON ST_DWithin(
+    trajectory(t.trip)::geography,
+    p.geo_point,
+    {{.Radius}}
+  )
+WHERE t.trip_id = '{{.TripID}}';
+{{end}}
+
+
+-- Trips' start district
+{{define "TripStartingDistrict"}}
+SELECT t.trip_id, d.name AS start_district
+FROM trips t
 JOIN districts d
-  ON ST_Within(trajectory(e.tgeo_point)::geometry, d.geo_shape)
-WHERE d.name = '{{.DistrictName}}'
-  AND e.tgeo_point && tstzspan '[{{.StartTime}}, {{.EndTime}}]';
+  ON ST_Intersects(startValue(t.trip), d.geo_shape)
+WHERE t.trip_id = '{{.TripID}}';
 {{end}}
 
-{{define "EscooterEventsNearPoiInTimeRange"}}
-SELECT e.*
-FROM escooter_events e
-JOIN pois p
-  ON ST_DWithin(trajectory(e.tgeo_point)::geometry, p.geo_point, {{.Radius}})
-WHERE p.poi_id = '{{.POIID}}'
-  AND e.tgeo_point && tstzspan '[{{.StartTime}}, {{.EndTime}}]';
-{{end}}
-
-{{define "EscootersAtTimeInDistrict"}}
-SELECT DISTINCT e.trip_id
-FROM escooter_events e
+-- Trip's end district
+{{define "TripEndDistrict"}}
+SELECT t.trip_id, d.name AS end_district
+FROM trips t
 JOIN districts d
-  ON ST_Within(getValue(atTime(e.tgeo_point, timestamptz '{{.Timestamp}}'))::geometry, d.geo_shape)
-WHERE d.name = '{{.DistrictName}}'
-  AND e.tgeo_point @ timestamptz '{{.Timestamp}}';
-{{end}}
-
-{{define "NearestEscooterToPOIAtTime"}}
-SELECT e.trip_id,
-       ST_Distance(getValue(atTime(e.tgeo_point, timestamptz '{{.Timestamp}}'))::geometry, p.geo_point) AS dist
-FROM escooter_events e
-JOIN pois p
-  ON p.poi_id = '{{.POIID}}'
-WHERE e.tgeo_point @ timestamptz '{{.Timestamp}}'
-ORDER BY dist
-LIMIT 1;
+  ON ST_Intersects(endValue(t.trip), d.geo_shape)
+WHERE t.trip_id = '{{.TripID}}';
 {{end}}
 
 
-{{define "EscootersNearPOI"}}
-SELECT DISTINCT e.trip_id
-FROM escooter_events e
-JOIN pois p
-  ON ST_DWithin(trajectory(e.tgeo_point)::geometry, p.geo_point, {{.Radius}})
-WHERE p.poi_id = '{{.POIID}}';
-{{end}}
-
-{{define "CountEventsInDistrictPerHour"}}
-SELECT COUNT(*) AS event_count
-FROM escooter_events e
-JOIN districts d
-  ON ST_Within(trajectory(e.tgeo_point)::geometry, d.geo_shape)
-WHERE d.name = '{{.DistrictName}}';
-{{end}}
-
-{{define "EscootersWithPOIsInRadiusOfEachOther"}}
-SELECT e.*, p.*
-FROM escooter_events e
-JOIN pois p
-  ON ST_DWithin(trajectory(e.tgeo_point)::geometry, p.geo_point, {{.Radius}})
+-- POIs close to the end of a trip
+{{define "PoisCloseToEndDestination"}}
+SELECT p.poi_id, p.name, ST_Distance(p.geo_point, endValue(t.trip)) AS distance
+FROM trips t
+CROSS JOIN pois p
+WHERE t.trip_id = '{{.TripID}}'
+ORDER BY distance ASC
 LIMIT {{.Limit}};
 {{end}}
