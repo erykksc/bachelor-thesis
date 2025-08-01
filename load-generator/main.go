@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"path"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -258,6 +259,9 @@ func createInsertCSVFile(dbTarget DBTarget, numWorkers, batchSize int, useBulkIn
 
 	filename := fmt.Sprintf("results_insert_%s_%s_%dw_%db_%s_%s.csv",
 		dbTarget.String(), timestamp, numWorkers, batchSize, bulkStr, tripsBasename)
+	filename = path.Join("results", filename)
+
+	os.MkdirAll("./results", 0777)
 
 	file, err := os.Create(filename)
 	if err != nil {
@@ -275,6 +279,9 @@ func createQueryCSVFile(dbTarget DBTarget, numWorkers, numQueries int, queriesPa
 
 	filename := fmt.Sprintf("results_query_%s_%s_%dw_%dq_%s.csv",
 		dbTarget.String(), timestamp, numWorkers, numQueries, queriesBasename)
+	filename = path.Join("results", filename)
+
+	os.MkdirAll("./results", 0777)
 
 	file, err := os.Create(filename)
 	if err != nil {

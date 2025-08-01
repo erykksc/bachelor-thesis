@@ -25,3 +25,5 @@ opentofu/.terraform/
 *.bcf
 *.synctex.gz
 thesis/thesis.pdf
+
+load-generator/results/
