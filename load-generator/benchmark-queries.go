@@ -217,7 +217,7 @@ func ValidateTemplates(ctx context.Context, templates *template.Template, connSt
 		}
 		rows.Close()
 
-		logger.Debug("Template validation passed", "template", tmpl.Name())
+		logger.Info("Template validation passed", "template", tmpl.Name())
 	}
 	return nil
 }
@@ -394,14 +394,14 @@ type QueryFieldGenerator struct {
 
 // QueryFields contains all possible template parameters
 type QueryFields struct {
-	LocalityName string
-	EndTime      string // RFC3339 string
-	Limit        int
-	POIID        string
-	Radius       float64
-	StartTime    string // RFC3339 string
-	Timestamp    string // RFC3339 string
-	TripID       string
+	LocalityId string
+	EndTime    string // RFC3339 string
+	Limit      int
+	POIID      string
+	Radius     float64
+	StartTime  string // RFC3339 string
+	Timestamp  string // RFC3339 string
+	TripID     string
 }
 
 // NewQueryFieldGenerator creates a new seeded field generator
@@ -441,12 +441,12 @@ func (g *QueryFieldGenerator) GenerateFields(queryIndex int) QueryFields {
 
 	// Generate start time first
 	timeRange := g.maxTime.Unix() - g.minTime.Unix()
-	startOffset := rng.Int63n(timeRange - 3600) // Leave 1 hour for EndTime
+	startOffset := rng.Int63n(timeRange - 3600*6) // Leave 6 hours for EndTime
 	startTime := time.Unix(g.minTime.Unix()+startOffset, 0)
 
-	// Generate end time after start time (1 minute to 1 hour later)
-	minDuration := int64(60)   // 1 minute
-	maxDuration := int64(3600) // 1 hour
+	// Generate end time after start time
+	minDuration := int64(3600 * 1) // 1 hour
+	maxDuration := int64(3600 * 6) // 6 hours
 	duration := minDuration + rng.Int63n(maxDuration-minDuration)
 	endTime := startTime.Add(time.Duration(duration) * time.Second)
 
@@ -455,13 +455,13 @@ func (g *QueryFieldGenerator) GenerateFields(queryIndex int) QueryFields {
 	timestamp := time.Unix(g.minTime.Unix()+timestampOffset, 0)
 
 	return QueryFields{
-		LocalityName: g.localities[rng.Intn(len(g.localities))].Name,
-		Limit:        5 + rng.Intn(100), // 5-100
-		POIID:        g.pois[rng.Intn(len(g.pois))].POIID,
-		Radius:       1000 + rng.Float64()*4000, // 1000-5000 meters
-		StartTime:    startTime.Format(time.RFC3339),
-		EndTime:      endTime.Format(time.RFC3339),
-		Timestamp:    timestamp.Format(time.RFC3339),
-		TripID:       g.tripIDs[rng.Intn(len(g.tripIDs))],
+		LocalityId: g.localities[rng.Intn(len(g.localities))].LocalityID,
+		Limit:      5 + rng.Intn(95), // 5-100
+		POIID:      g.pois[rng.Intn(len(g.pois))].POIID,
+		Radius:     1000 + rng.Float64()*4000, // 1000-5000 meters
+		StartTime:  startTime.Format(time.RFC3339),
+		EndTime:    endTime.Format(time.RFC3339),
+		Timestamp:  timestamp.Format(time.RFC3339),
+		TripID:     g.tripIDs[rng.Intn(len(g.tripIDs))],
 	}
 }

@@ -9,6 +9,8 @@ CREATE TABLE IF NOT EXISTS escooter_events (
     geo_point geometry(Point, 4326)
 );
 
+CREATE INDEX IF NOT EXISTS escooter_events_timestamp_idx   ON escooter_events (timestamp);
+
 CREATE TABLE IF NOT EXISTS trips (
     trip_id         UUID PRIMARY KEY,
     trip            tgeogpoint

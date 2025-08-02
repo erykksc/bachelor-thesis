@@ -1,9 +1,5 @@
--- What is the time span of the whole dataset?
-SELECT MIN(startTimestamp(trip)) AS begin, MAX(endTimestamp(trip)) AS end
-FROM trips;
-
 -- Data summaries
-define{{"DataSummaries"}}
+{{define "DataSummaries"}}
 SELECT 
     MIN(length(trip)) AS minLength,
     MAX(length(trip)) AS maxLength,
@@ -13,6 +9,80 @@ SELECT
     AVG(duration(trip)) AS avgDuration,
     MIN(numInstants(trip)) AS minPoints,
     MAX(numInstants(trip)) AS maxPoints,
-    AVG(numInstants(trip)) AS avgPoints,
-FROM trips;
+    AVG(numInstants(trip)) AS avgPoints
+FROM trips
+WHERE trip && tstzspan '[{{.StartTime}}, {{.EndTime}}]';
+{{end}}
+
+
+-- Which vehicle trips passed through locality in timeframe
+{{define "TripsInLocality"}}
+SELECT t.trip_id
+FROM trips t
+JOIN localities l
+  ON tintersects(t.trip::tgeompoint, l.geo_shape) ?= true
+WHERE l.locality_id = '{{.LocalityId}}'
+AND t.trip && tstzspan '[{{.StartTime}}, {{.EndTime}}]';
+{{end}}
+
+
+-- N closest trips to POI
+{{define "NClosestTripsToPoi"}}
+SELECT t.trip_id, t.trip |=| p.geo_point AS distance
+FROM trips t, pois p
+WHERE p.poi_id = '{{.POIID}}'
+ORDER BY distance ASC
+LIMIT {{.Limit}};
+{{end}}
+
+
+-- How many trips start and finish in different localities?
+{{define "StartEndInDifferentLocalities"}}
+SELECT COUNT(*)
+FROM trips T, localities S, localities E
+WHERE S.locality_id <> E.locality_id
+  AND ST_Intersects(startValue(T.trip), S.geo_shape)
+  AND ST_Intersects(endValue(T.trip), E.geo_shape)
+  AND T.trip && tstzspan '[{{.StartTime}}, {{.EndTime}}]'
+{{end}}
+
+
+{{define "EventDensityHeatmapPerLocality"}}
+SELECT l.name AS locality,
+       date_trunc('hour', e.timestamp) AS hour,
+       COUNT(*) AS event_count
+FROM escooter_events e
+JOIN localities l ON ST_Within(e.geo_point::geometry, l.geo_shape::geometry)
+WHERE e.timestamp BETWEEN '{{.StartTime}}' AND '{{.EndTime}}'
+GROUP BY l.name, hour
+ORDER BY l.name, hour;
+{{end}}
+
+{{define "TripDurationsPerLocality"}}
+WITH trip_durations AS (
+  SELECT trip_id,
+         EXTRACT(EPOCH FROM MAX(timestamp) - MIN(timestamp)) AS duration_secs
+  FROM escooter_events
+  WHERE timestamp BETWEEN '{{.StartTime}}' AND '{{.EndTime}}'
+  GROUP BY trip_id
+  HAVING EXTRACT(EPOCH FROM MAX(timestamp) - MIN(timestamp)) > 60
+)
+SELECT d.name AS locality,
+       AVG(td.duration_secs) AS avg_duration_secs
+FROM trip_durations td
+JOIN escooter_events e ON e.trip_id = td.trip_id
+JOIN localities d ON ST_Within(e.geo_point::geometry, d.geo_shape::geometry)
+WHERE e.timestamp BETWEEN '{{.StartTime}}' AND '{{.EndTime}}'
+GROUP BY d.name
+ORDER BY avg_duration_secs DESC;
+{{end}}
+
+{{define "MostVisitedPOIs"}}
+SELECT p.poi_id, p.name, COUNT(*) AS visits
+FROM escooter_events e
+JOIN pois p ON ST_DWithin(p.geo_point::geometry, e.geo_point::geometry, {{.Radius}})
+WHERE e.timestamp BETWEEN '{{.StartTime}}' AND '{{.EndTime}}'
+GROUP BY p.poi_id, p.name
+ORDER BY visits DESC
+LIMIT {{.Limit}};
 {{end}}
