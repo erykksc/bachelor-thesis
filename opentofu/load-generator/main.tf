@@ -120,5 +120,5 @@ resource "azurerm_linux_virtual_machine" "load_generator" {
   }
 
   # Run setup script on first boot
-  custom_data = base64encode(file("${path.module}/../setup-vm.sh"))
+  custom_data = base64encode(file("${path.module}/init-vm.sh"))
 }
