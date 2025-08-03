@@ -191,10 +191,17 @@ csvScanLoop:
 	}
 
 	// Create trips table
-	if dbTarget == MobilityDB {
+	switch dbTarget {
+	case MobilityDB:
 		err := importEventsIntoTrips(ctx, connString)
 		if err != nil {
 			logger.Error("Error during import of events into trips table", "error", err)
+			os.Exit(1)
+		}
+	case CrateDB:
+		err := importEventsIntoTripSummaries(ctx, connString)
+		if err != nil {
+			logger.Error("Error during import of events into trip_summaries table", "error", err)
 			os.Exit(1)
 		}
 	}
@@ -431,5 +438,111 @@ ON CONFLICT (trip_id) DO UPDATE
 
 	endTime := time.Now()
 	logger.Info("Finished importing escooter_events into trips table", "startTime", startTime, "endTime", endTime, "durationInS", endTime.Sub(startTime).Seconds())
+	return nil
+}
+
+func importEventsIntoTripSummaries(ctx context.Context, connString string) error {
+	startTime := time.Now()
+	logger.Info("Importing escooter_events into trip_summaries table", "startTime", startTime)
+
+	conn, err := pgx.Connect(ctx, connString)
+	if err != nil {
+		return fmt.Errorf("Unable to connect to database: %w", err)
+	}
+	defer conn.Close(ctx)
+
+	// First, get total number of distinct trips
+	var totalTrips int
+	err = conn.QueryRow(ctx, "SELECT COUNT(DISTINCT trip_id) FROM escooter_events").Scan(&totalTrips)
+	if err != nil {
+		return fmt.Errorf("Getting total trip count: %w", err)
+	}
+
+	logger.Info("Processing trips in batches", "totalTrips", totalTrips)
+
+	// Process in batches of 1000 trips to avoid memory issues
+	batchSize := 1000
+	totalBatches := (totalTrips + batchSize - 1) / batchSize
+	
+	for batch := 0; batch < totalBatches; batch++ {
+		offset := batch * batchSize
+		
+		logger.Info("Processing batch", "batch", batch+1, "totalBatches", totalBatches, "offset", offset)
+
+		batchQuery := `
+INSERT INTO trip_summaries (
+	trip_id, start_time, end_time, start_point, end_point, 
+	trip_length_m, trip_duration_s, point_count
+)
+WITH batch_trips AS (
+	SELECT DISTINCT trip_id 
+	FROM escooter_events 
+	ORDER BY trip_id 
+	LIMIT $1 OFFSET $2
+),
+trip_endpoints AS (
+	SELECT 
+		e.trip_id,
+		MIN(e.timestamp) AS start_time,
+		MAX(e.timestamp) AS end_time
+	FROM escooter_events e
+	JOIN batch_trips bt ON e.trip_id = bt.trip_id
+	GROUP BY e.trip_id
+),
+trip_start_points AS (
+	SELECT DISTINCT 
+		e.trip_id,
+		e.geo_point AS start_point
+	FROM escooter_events e
+	JOIN trip_endpoints te ON e.trip_id = te.trip_id AND e.timestamp = te.start_time
+),
+trip_end_points AS (
+	SELECT DISTINCT 
+		e.trip_id,
+		e.geo_point AS end_point
+	FROM escooter_events e
+	JOIN trip_endpoints te ON e.trip_id = te.trip_id AND e.timestamp = te.end_time
+),
+trip_metrics AS (
+	SELECT 
+		trip_id,
+		SUM(CASE WHEN next_point IS NOT NULL THEN distance(geo_point, next_point) ELSE 0 END) AS trip_length_m,
+		COUNT(*) AS point_count
+	FROM (
+		SELECT 
+			e.trip_id, e.geo_point,
+			LEAD(e.geo_point) OVER (PARTITION BY e.trip_id ORDER BY e.timestamp) AS next_point
+		FROM escooter_events e
+		JOIN batch_trips bt ON e.trip_id = bt.trip_id
+	) windowed_events
+	GROUP BY trip_id
+)
+SELECT 
+	te.trip_id,
+	te.start_time,
+	te.end_time,
+	tsp.start_point,
+	tep.end_point,
+	tm.trip_length_m,
+	EXTRACT(EPOCH FROM (te.end_time - te.start_time)) AS trip_duration_s,
+	tm.point_count
+FROM trip_endpoints te
+JOIN trip_start_points tsp ON te.trip_id = tsp.trip_id
+JOIN trip_end_points tep ON te.trip_id = tep.trip_id
+JOIN trip_metrics tm ON te.trip_id = tm.trip_id;`
+
+		_, err = conn.Exec(ctx, batchQuery, batchSize, offset)
+		if err != nil {
+			return fmt.Errorf("Executing batch %d insert to trip_summaries: %w", batch+1, err)
+		}
+
+		// Log progress every 10 batches
+		if (batch+1)%10 == 0 || batch+1 == totalBatches {
+			logger.Info("Batch progress", "completedBatches", batch+1, "totalBatches", totalBatches, "progress", fmt.Sprintf("%.1f%%", float64(batch+1)/float64(totalBatches)*100))
+		}
+	}
+
+	endTime := time.Now()
+	logger.Info("Finished importing escooter_events into trip_summaries table", "startTime", startTime, "endTime", endTime, "durationInS", endTime.Sub(startTime).Seconds(), "totalTrips", totalTrips, "totalBatches", totalBatches)
 	return nil
 }

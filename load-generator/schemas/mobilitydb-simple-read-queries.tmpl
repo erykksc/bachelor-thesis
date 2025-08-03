@@ -46,19 +46,19 @@ WHERE t.trip_id = '{{.TripID}}';
 
 -- Trips' start locality
 {{define "TripStartingLocality"}}
-SELECT t.trip_id, d.name AS start_locality
+SELECT t.trip_id, l.name AS start_locality
 FROM trips t
-JOIN localities d
-  ON ST_Intersects(startValue(t.trip), d.geo_shape)
+JOIN localities l
+  ON ST_Intersects(startValue(t.trip), l.geo_shape)
 WHERE t.trip_id = '{{.TripID}}';
 {{end}}
 
 -- Trip's end locality
 {{define "TripEndLocality"}}
-SELECT t.trip_id, d.name AS end_locality
+SELECT t.trip_id, l.name AS end_locality
 FROM trips t
-JOIN localities d
-  ON ST_Intersects(endValue(t.trip), d.geo_shape)
+JOIN localities l
+  ON ST_Intersects(endValue(t.trip), l.geo_shape)
 WHERE t.trip_id = '{{.TripID}}';
 {{end}}
 

@@ -31,6 +31,7 @@ AND t.trip && tstzspan '[{{.StartTime}}, {{.EndTime}}]';
 SELECT t.trip_id, t.trip |=| p.geo_point AS distance
 FROM trips t, pois p
 WHERE p.poi_id = '{{.POIID}}'
+  AND t.trip && tstzspan '[{{.StartTime}}, {{.EndTime}}]'
 ORDER BY distance ASC
 LIMIT {{.Limit}};
 {{end}}
@@ -67,13 +68,13 @@ WITH trip_durations AS (
   GROUP BY trip_id
   HAVING EXTRACT(EPOCH FROM MAX(timestamp) - MIN(timestamp)) > 60
 )
-SELECT d.name AS locality,
+SELECT l.name AS locality,
        AVG(td.duration_secs) AS avg_duration_secs
 FROM trip_durations td
 JOIN escooter_events e ON e.trip_id = td.trip_id
-JOIN localities d ON ST_Within(e.geo_point::geometry, d.geo_shape::geometry)
+JOIN localities l ON ST_Within(e.geo_point::geometry, l.geo_shape::geometry)
 WHERE e.timestamp BETWEEN '{{.StartTime}}' AND '{{.EndTime}}'
-GROUP BY d.name
+GROUP BY l.name
 ORDER BY avg_duration_secs DESC;
 {{end}}
 

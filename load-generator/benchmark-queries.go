@@ -440,13 +440,13 @@ func (g *QueryFieldGenerator) GenerateFields(queryIndex int) QueryFields {
 	rng := rand.New(rand.NewSource(seed))
 
 	// Generate start time first
+	minDuration := int64(3600 * 24 * 6)
+	maxDuration := int64(3600 * 24 * 7)
+
 	timeRange := g.maxTime.Unix() - g.minTime.Unix()
-	startOffset := rng.Int63n(timeRange - 3600*6) // Leave 6 hours for EndTime
+	startOffset := rng.Int63n(timeRange - maxDuration)
 	startTime := time.Unix(g.minTime.Unix()+startOffset, 0)
 
-	// Generate end time after start time
-	minDuration := int64(3600 * 1) // 1 hour
-	maxDuration := int64(3600 * 6) // 6 hours
 	duration := minDuration + rng.Int63n(maxDuration-minDuration)
 	endTime := startTime.Add(time.Duration(duration) * time.Second)
 
@@ -456,7 +456,7 @@ func (g *QueryFieldGenerator) GenerateFields(queryIndex int) QueryFields {
 
 	return QueryFields{
 		LocalityId: g.localities[rng.Intn(len(g.localities))].LocalityID,
-		Limit:      5 + rng.Intn(95), // 5-100
+		Limit:      5 + rng.Intn(95),
 		POIID:      g.pois[rng.Intn(len(g.pois))].POIID,
 		Radius:     1000 + rng.Float64()*4000, // 1000-5000 meters
 		StartTime:  startTime.Format(time.RFC3339),
