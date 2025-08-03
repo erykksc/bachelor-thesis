@@ -1,116 +1,16 @@
-# Stateful set for the crateDB
-apiVersion: "apps/v1"
-kind: StatefulSet
+apiVersion: cloud.crate.io/v1
+kind: CrateDB
 metadata:
-  namespace: {{ .Values.namespace }}
-  name: {{ template "cratedb.name" . }}
-  labels:
-  {{- include "cratedb.labels" . | nindent 4 }}
+  name: ba-cratedb-cluster
+  namespace: default
 spec:
-  serviceName: {{ .Values.cratadbStatefulsetName }}
-  replicas: {{ .Values.replicas }}
-  persistentVolumeClaimRetentionPolicy:
-    whenDeleted: Delete
-  selector:
-    matchLabels:
-  {{- include "cratedb.selectorLabels" . | nindent 6 }}
-  template:
-    metadata:
-      namespace: {{ .Values.namespace }}
-      {{- with .Values.podAnnotations }}
-      annotations:
-      {{- toYaml . | nindent 8 }}
-      {{- end }}
-      labels:
-    {{- include "cratedb.selectorLabels" . | nindent 8 }}
-    spec:
-      {{- with .Values.imagePullSecrets }}
-      imagePullSecrets:
-      {{- toYaml . | nindent 8 }}
-      {{- end }}
-      serviceAccountName: {{ include "cratedb.serviceAccountName" . }}
-      securityContext:
-      {{- toYaml .Values.podSecurityContext | nindent 8 }}
-      {{- if .Values.affinity }}
-      affinity:
-      {{ tpl .Values.affinity | indent 8 }}
-      {{- end }}
-      # This is to set the correct memory map
-      initContainers:
-        - name: init-sysctl
-          image: busybox
-          imagePullPolicy: IfNotPresent
-          command: ["sysctl", "-w", "vm.max_map_count=262144"]
-          securityContext:
-            privileged: true
-      containers:
-        - name: crate
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
-          # Pass in configuration to CrateDB via command-line options.
-          # Notice that we are configuring CrateDB unicast host discovery
-          # using the SRV records provided by Kubernetes.
-          command:
-            - /docker-entrypoint.sh
-            - -Cnode.name=${POD_NAME}
-            - -Ccluster.name=${CLUSTER_NAME}
-            {{- $n := .Values.replicas | int -}}
-            {{- $list := list -}}
-            {{- range $i := until $n }}
-              {{- $list = append $list (printf "cratedb-%d" $i) -}}
-            {{- end }}
-            - -Ccluster.initial_master_nodes="{{ join "," $list }}"
-            - -Cdiscovery.seed_providers={{ .Values.cratedbConfig.discovery.zen.hostsProvider }}
-            - -Cdiscovery.srv.query=_crate-internal._tcp.{{ .Values.internalService.name }}.${NAMESPACE}.svc.cluster.local
-            - -Cgateway.recover_after_data_nodes=${EXPECTED_DATA_NODES}
-            - -Cgateway.expected_data_nodes=${EXPECTED_DATA_NODES}
-            - -Chttp.cors.allow-origin={{ .Values.http.cors.allowOrigin }}
-            - -Chttp.cors.enabled={{ .Values.http.cors.enabled }}
-            - -Cpath.data={{ .Values.cratedbConfig.dataPath }}
-          {{- if .Values.resources }}
-          resources: {{ toYaml .Values.resources | nindent 12 }}
-          {{- end }}
-          ports:
-            # Port 4300 for inter-node communication.
-            - containerPort: {{ .Values.internalService.port }}
-              name: {{ .Values.internalService.portName }}
-              # Port 4200 for HTTP clients.
-            - containerPort: {{ .Values.externalService.webUiPort }}
-              name: {{ .Values.externalService.webPortName }}
-              # Port 5432 for PostgreSQL wire protocol clients.
-            - containerPort: {{ .Values.externalService.pgsqlWirePort }}
-              name: {{ .Values.externalService.pgsqlWirePortName }}
-          env:
-            # These variable are detected by CrateDB.
-            - name: POD_NAME
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.name
-            - name: CRATE_HEAP_SIZE
-              value: "{{ .Values.heapSize }}"
-            - name: EXPECTED_DATA_NODES
-              value: "{{ .Values.replicas }}"
-            - name: CLUSTER_NAME
-              value: {{ .Values.clusterName }}
-            - name: NAMESPACE
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.namespace
-          volumeMounts:
-            - mountPath: {{ .Values.cratedbConfig.dataPath }}
-              name: cratedb-data-volume
-      volumes:
-        - name: cratedb-data-volume
-          emptyDir: {}
-      {{- with .Values.nodeSelector }}
-      nodeSelector:
-      {{- toYaml . | nindent 8 }}
-      {{- end }}
-      {{- with .Values.affinity }}
-      affinity:
-      {{- toYaml . | nindent 8 }}
-      {{- end }}
-      {{- with .Values.tolerations }}
-      tolerations:
-      {{- toYaml . | nindent 8 }}
-      {{- end }}
+  cluster:
+    imageRegistry: crate
+    name: crate-cluster
+    version: {{ .Values.version }}
+  nodes:
+    data:
+      - name: hot
+        replicas: {{ .Values.replicas }}
+        resources: 
+          {{- toYaml .Values.resources | nindent 10 }}

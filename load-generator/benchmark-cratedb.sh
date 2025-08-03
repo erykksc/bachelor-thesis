@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -euo pipefail 
+
 # ALL OF THOSE BENCHMARKS NEED TO BE RUN ON DIFFERENT CLUSTER SIZES
 # ALL OF THOSE BENCHMARKS NEED TO BE RUN BOTH FOR CRATEDB AND MOBILITYDBC
 
@@ -24,7 +26,7 @@
 # Default values
 BATCH_SIZE=2000
 DB='postgresql://crate:crate@localhost:5432'
-NWORKERS=16
+NWORKERS=10
 NCOMPLEXQRS=100000000000 # 100 billion queries, it should be impossible to perform so that the timeout is reached
 NSIMPLEQRS=100000000000 # 100 billion queries
 TRIPS='../dataset-generator/output/escooter-trips-small.csv'
@@ -58,6 +60,8 @@ go run . --mode insert \
   --bulk-insert \
   --trips $TRIPS
 
+sleep 180
+
 # Simple queries
 timeout --signal=INT $QRS_TIMEOUT go run . --mode query \
   --dbTarget cratedb \
@@ -65,6 +69,8 @@ timeout --signal=INT $QRS_TIMEOUT go run . --mode query \
   --nworkers $NWORKERS \
   --queries ./schemas/cratedb-simple-read-queries.tmpl \
   --nqueries $NSIMPLEQRS
+
+sleep 180
 
 # Complex queries
 timeout --signal=INT $QRS_TIMEOUT go run . --mode query \
