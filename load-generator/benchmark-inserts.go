@@ -124,7 +124,6 @@ Waiting4Workers:
 	tripEventsCount := 0
 	batch := make([]TripEvent, 0, batchSize)
 
-csvScanLoop:
 	for {
 		rec, err := r.Read()
 		if err == io.EOF {
@@ -132,7 +131,7 @@ csvScanLoop:
 			if len(batch) > 0 {
 				select {
 				case <-ctx.Done():
-					break csvScanLoop
+					return
 				case jobs <- batch:
 				}
 			}
@@ -157,7 +156,7 @@ csvScanLoop:
 		if len(batch) >= batchSize {
 			select {
 			case <-ctx.Done():
-				break csvScanLoop
+				return
 			case jobs <- batch:
 			}
 			batch = make([]TripEvent, 0, batchSize)
