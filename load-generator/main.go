@@ -84,7 +84,7 @@ func main() {
 		numWorkers      = flag.Int("nworkers", 24, "Number of simultanious workers for the benchmark to use")
 		batchSize       = flag.Int("batch-size", 1000, "Number of trip events to insert per sent request")
 		useBulkInsert   = flag.Bool("bulk-insert", false, "Insert rows using UNNEST, one query with many inserts")
-		logDebug        = flag.Bool("log-debug", false, "Turn on the DEBUG level for logging")
+		logLevel        = flag.String("log", "INFO", "Set <level> for logging. Available: DEBUG, INFO, WARN")
 		numQueries      = flag.Int("nqueries", 100, "Number of queries to execute")
 		randomSeed      = flag.Int64("seed", 42, "Random seed for deterministic query generation")
 		queriesFilepath = flag.String("queries", "./schemas/cratedb-simple-read-queries.tmpl", "Path to a file containing query templates")
@@ -93,8 +93,16 @@ func main() {
 	flag.Parse()
 
 	level := slog.LevelInfo
-	if *logDebug {
+	switch *logLevel {
+	case "DEBUG":
 		level = slog.LevelDebug
+	case "INFO":
+		level = slog.LevelInfo
+	case "WARN":
+		level = slog.LevelWarn
+	default:
+		fmt.Printf("Unknown logging level: %s", *logLevel)
+		os.Exit(1)
 	}
 
 	handler := slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
@@ -103,18 +111,18 @@ func main() {
 	logger = slog.New(handler)
 
 	logger.Info("Starting load-generator with following cli arguments",
-		"db", dbTargetStr,
-		"localities", localitiesPath,
-		"pois", poisPath,
-		"trips", tripsPath,
-		"migrations", migrationsDir,
-		"mode", mode,
-		"nworkers", numWorkers,
-		"log-debug", logDebug,
-		"queries-per-worker", numQueries,
-		"seed", randomSeed,
-		"qtemplates", queriesFilepath,
-		"tevents", tripEventsCSV,
+		"db", *dbTargetStr,
+		"localities", *localitiesPath,
+		"pois", *poisPath,
+		"trips", *tripsPath,
+		"migrations", *migrationsDir,
+		"mode", *mode,
+		"nworkers", *numWorkers,
+		"log", *logLevel,
+		"queries-per-worker", *numQueries,
+		"seed", *randomSeed,
+		"qtemplates", *queriesFilepath,
+		"tevents", *tripEventsCSV,
 	)
 
 	var dbTarget DBTarget

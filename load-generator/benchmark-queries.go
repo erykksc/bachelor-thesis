@@ -83,7 +83,7 @@ func benchmarkQueries(ctx context.Context, connString string, numWorkers int, db
 		defer csvWg.Done()
 		for event := range eventCh {
 			// Log the event (replacing worker logging)
-			logger.Info("Query worker finished query",
+			logger.Debug("Query worker finished query",
 				"workerId", event.WorkerID,
 				"jobType", event.JobType,
 				"templateName", event.TemplateName,
@@ -123,7 +123,7 @@ Waiting4Workers:
 		case <-ctx.Done():
 			return
 		case readyWorkerId := <-readyStatus:
-			logger.Info("Worker reported ready", "id", readyWorkerId)
+			logger.Debug("Worker reported ready", "id", readyWorkerId)
 			workersReady += 1
 			if workersReady == numWorkers {
 				break Waiting4Workers
@@ -267,7 +267,7 @@ type QueryJob struct {
 
 // queryWorker executes queries
 func queryWorker(ctx context.Context, id int, connString string, templates *template.Template, jobs <-chan QueryJob, readyStatus chan<- int, successCh chan<- int, failureCh chan<- int, eventCh chan<- QueryEvent) {
-	logger.Info("Query worker started", "id", id)
+	logger.Debug("Query worker started", "id", id)
 
 	conn, err := pgx.Connect(ctx, connString)
 	if err != nil {
@@ -275,7 +275,7 @@ func queryWorker(ctx context.Context, id int, connString string, templates *temp
 		return
 	}
 	defer conn.Close(ctx)
-	logger.Info("Query worker connected to db", "id", id)
+	logger.Debug("Query worker connected to db", "id", id)
 
 	queryIndex := -1
 	successfulQueries := 0
@@ -303,7 +303,6 @@ func queryWorker(ctx context.Context, id int, connString string, templates *temp
 			return
 		case job, ok := <-jobs:
 			if !ok {
-				logger.Info("Worker closing", "id", id)
 				return
 			}
 			queryIndex++

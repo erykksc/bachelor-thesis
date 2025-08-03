@@ -57,7 +57,7 @@ func benchmarkInserts(ctx context.Context, connString string, numWorkers int, ba
 		defer csvWg.Done()
 		for event := range eventCh {
 			// Log the event (replacing worker logging)
-			logger.Info("Worker finished batch insert",
+			logger.Debug("Worker finished batch insert",
 				"workerId", event.WorkerID,
 				"jobType", event.JobType,
 				"batchSize", event.BatchSize,
@@ -96,7 +96,7 @@ Waiting4Workers:
 		case <-ctx.Done():
 			return
 		case readyWorkerId := <-readyStatus:
-			logger.Info("Worker reported ready", "id", readyWorkerId)
+			logger.Debug("Worker reported ready", "id", readyWorkerId)
 			workersReady += 1
 			if workersReady == numWorkers {
 				break Waiting4Workers
@@ -213,7 +213,7 @@ csvScanLoop:
 //   - the latency of getting a response
 //   - time spend waiting for receiving the next job through channel
 func insertWorker(ctx context.Context, id int, tripEventBatches <-chan []TripEvent, connString string, dbTarget DBTarget, useBulkInsert bool, successCh chan<- int, failureCh chan<- int, eventCh chan<- InsertEvent, readyStatus chan<- int) {
-	logger.Info("Worker started", "id", id)
+	logger.Debug("Worker started", "id", id)
 
 	conn, err := pgx.Connect(ctx, connString)
 	if err != nil {
@@ -221,7 +221,7 @@ func insertWorker(ctx context.Context, id int, tripEventBatches <-chan []TripEve
 		os.Exit(1)
 	}
 	defer conn.Close(ctx)
-	logger.Info("Worker connected to db", "id", id)
+	logger.Debug("Worker connected to db", "id", id)
 
 	readyStatus <- id
 
@@ -264,7 +264,6 @@ func insertWorker(ctx context.Context, id int, tripEventBatches <-chan []TripEve
 			return
 		case batch, ok := <-tripEventBatches:
 			if !ok {
-				logger.Info("Worker finished", "id", id)
 				return
 			}
 
@@ -280,7 +279,7 @@ func insertWorker(ctx context.Context, id int, tripEventBatches <-chan []TripEve
 				insertQuery := bulkInsertEventSql(batch)
 				res, err := conn.Exec(ctx, insertQuery)
 				insertedInQuery += int(res.RowsAffected())
-				logger.Info("Bulk inserted trip events", "worker", id, "rowsAffected", res.RowsAffected(), "error", err)
+				logger.Debug("Bulk inserted trip events", "worker", id, "rowsAffected", res.RowsAffected(), "error", err)
 			} else {
 				// Use pgx batch for efficient batch inserts
 				pgxBatch := &pgx.Batch{}
@@ -463,10 +462,10 @@ func importEventsIntoTripSummaries(ctx context.Context, connString string) error
 	// Process in batches of 1000 trips to avoid memory issues
 	batchSize := 1000
 	totalBatches := (totalTrips + batchSize - 1) / batchSize
-	
+
 	for batch := 0; batch < totalBatches; batch++ {
 		offset := batch * batchSize
-		
+
 		logger.Info("Processing batch", "batch", batch+1, "totalBatches", totalBatches, "offset", offset)
 
 		batchQuery := `
