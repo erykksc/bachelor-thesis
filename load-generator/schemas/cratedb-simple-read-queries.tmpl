@@ -1,83 +1,105 @@
-{{define "TripLength"}}
-SELECT SUM(distance(geo_point, next_geo)) AS trip_length_m
+-- Trip events (equivalent to GetTripEvents)
+{{define "GetTripEvents"}}
+SELECT geo_point, timestamp AS instant
+FROM escooter_events
+WHERE trip_id = '{{.TripID}}'
+ORDER BY timestamp;
+{{end}}
+
+-- Start and end timestamp of a trip (equivalent to TripFirstAndLastEvent)
+{{define "TripFirstAndLastEvent"}}
+SELECT MIN(timestamp) AS start_time, MAX(timestamp) AS end_time
+FROM escooter_events
+WHERE trip_id = '{{.TripID}}';
+{{end}}
+
+-- Length of a trip (equivalent to LengthOfTrip)
+{{define "LengthOfTrip"}}
+SELECT SUM(distance(geo_point, next_geo)) AS tripLengthInMeters
 FROM (
   SELECT
     geo_point,
-    LEAD(geo_point) OVER (ORDER BY "timestamp") AS next_geo
+    LEAD(geo_point) OVER (ORDER BY timestamp) AS next_geo
   FROM escooter_events
   WHERE trip_id = '{{.TripID}}'
 ) t
 WHERE next_geo IS NOT NULL;
 {{end}}
 
-{{define "EscooterTraceByTripID"}}
-SELECT *
-FROM escooter_events
-WHERE trip_id = '{{.TripID}}'
-ORDER BY timestamp;
+-- Average speed of trip in Km/h (equivalent to AverageSpeedOfTrip) - optimized version
+{{define "AverageSpeedOfTrip"}}
+WITH trip_points AS (
+  SELECT timestamp, geo_point,
+         LEAD(geo_point) OVER (ORDER BY timestamp) AS next_geo,
+         LEAD(timestamp) OVER (ORDER BY timestamp) AS next_timestamp
+  FROM escooter_events
+  WHERE trip_id = '{{.TripID}}'
+),
+speed_segments AS (
+  SELECT 
+    distance(geo_point, next_geo) AS segment_distance,
+    EXTRACT(EPOCH FROM (next_timestamp - timestamp)) AS segment_time
+  FROM trip_points
+  WHERE next_geo IS NOT NULL AND next_timestamp IS NOT NULL
+)
+SELECT 
+  CASE 
+    WHEN SUM(segment_time) > 0 
+    THEN (SUM(segment_distance) / SUM(segment_time)) * 3.6 
+    ELSE 0 
+  END AS avgSpeedInKmh
+FROM speed_segments;
 {{end}}
 
-{{define "LastKnownLocationPerTrip"}}
-SELECT trip_id, geo_point, timestamp
+-- POIs within radius of the trip trajectory (equivalent to PoisWithinRadiusDuringTrip)
+{{define "PoisWithinRadiusDuringTrip"}}
+SELECT DISTINCT p.*
+FROM escooter_events e
+JOIN pois p
+  ON distance(e.geo_point, p.geo_point) <= {{.Radius}}
+WHERE e.trip_id = '{{.TripID}}';
+{{end}}
+
+-- Trip's start locality (equivalent to TripStartingLocality) - optimized with LIMIT
+{{define "TripStartingLocality"}}
+SELECT '{{.TripID}}' AS trip_id, d.name AS start_locality
 FROM (
-    SELECT *,
-           ROW_NUMBER() OVER (PARTITION BY trip_id ORDER BY timestamp DESC) AS rn
-    FROM escooter_events
-) t
-WHERE rn = 1
+  SELECT geo_point
+  FROM escooter_events
+  WHERE trip_id = '{{.TripID}}'
+  ORDER BY timestamp
+  LIMIT 1
+) e
+JOIN localities d
+  ON within(e.geo_point, d.geo_shape);
+{{end}}
+
+-- Trip's end locality (equivalent to TripEndLocality) - optimized with LIMIT
+{{define "TripEndLocality"}}
+SELECT '{{.TripID}}' AS trip_id, d.name AS end_locality
+FROM (
+  SELECT geo_point
+  FROM escooter_events
+  WHERE trip_id = '{{.TripID}}'
+  ORDER BY timestamp DESC
+  LIMIT 1
+) e
+JOIN localities d
+  ON within(e.geo_point, d.geo_shape);
+{{end}}
+
+-- POIs close to the end of a trip (equivalent to PoisCloseToEndDestination)
+{{define "PoisCloseToEndDestination"}}
+SELECT p.poi_id, p.name, distance(p.geo_point, e.geo_point) AS distance
+FROM (
+  SELECT geo_point
+  FROM escooter_events
+  WHERE trip_id = '{{.TripID}}'
+  ORDER BY timestamp DESC
+  LIMIT 1
+) e
+CROSS JOIN pois p
+ORDER BY distance ASC
 LIMIT {{.Limit}};
 {{end}}
 
-{{define "EscootersInDistricsInTimeRange"}}
-SELECT e.*
-FROM escooter_events e
-JOIN localities d
-  ON within(e.geo_point, d.geo_shape)
-WHERE d.name = '{{.LocalityName}}'
-  AND e.timestamp BETWEEN '{{.StartTime}}' AND '{{.EndTime}}';
-{{end}}
-
-{{define "EscooterEventsNearPoiInTimeRange"}}
-SELECT e.*
-FROM escooter_events e
-JOIN pois p
-  ON distance(e.geo_point, p.geo_point) < {{.Radius}}
-WHERE p.poi_id = '{{.POIID}}'
-  AND e.timestamp BETWEEN '{{.StartTime}}' AND '{{.EndTime}}';
-{{end}}
-
-{{define "EscootersAtTimeInLocality"}}
-SELECT DISTINCT e.trip_id
-FROM escooter_events e
-JOIN localities d
-  ON within(e.geo_point, d.geo_shape)
-WHERE d.name = '{{.LocalityName}}'
-  AND e.timestamp = '{{.Timestamp}}';
-{{end}}
-
-{{define "NearestEscooterToPOIAtTime"}}
-SELECT e.trip_id,
-       distance(e.geo_point, p.geo_point) AS dist
-FROM escooter_events e
-JOIN pois p
-  ON p.poi_id = '{{.POIID}}'
-WHERE e.timestamp = '{{.Timestamp}}'
-ORDER BY dist
-LIMIT 1;
-{{end}}
-
-{{define "EscootersNearPOI"}}
-SELECT DISTINCT e.trip_id
-FROM escooter_events e
-JOIN pois p
-  ON distance(e.geo_point, p.geo_point) < {{.Radius}}
-WHERE p.poi_id = '{{.POIID}}';
-{{end}}
-
-{{define "EscootersWithPOIsInRadiusOfEachOther"}}
-SELECT e.*, p.*
-FROM escooter_events e
-JOIN pois p
-  ON distance(e.geo_point, p.geo_point) < {{.Radius}}
-LIMIT {{.Limit}};
-{{end}}
