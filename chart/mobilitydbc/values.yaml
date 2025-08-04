@@ -37,8 +37,8 @@ worker:
           topologyKey: kubernetes.io/hostname
 
 postgres:
-  user: postgres
-  password: postgres
+  user: researcher
+  password: bachelorthesis
   database: postgres
 
 # Internal service configuration
