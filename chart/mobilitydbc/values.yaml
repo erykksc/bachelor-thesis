@@ -1,15 +1,14 @@
-# Persistent volume configuration for both coordinator and worker
-persistentVolume:
-  storageClassName: "mobilitydb-premium"
+# Storage class to use for persistent volumes
+storageClassName: my-azure-storageclass
 
 coordinator:
   persistentVolume:
-    storageClassName: "mobilitydb-premium"
     accessModes:
       - ReadWriteOnce
     size: 100Gi
 
 manager:
+  # put it on the same node as coordinator
   affinity:
     podAffinity:
       requiredDuringSchedulingIgnoredDuringExecution:
@@ -21,23 +20,21 @@ manager:
           topologyKey: kubernetes.io/hostname
 
 worker:
-  replicas: 1
-  resources: {}
+  replicas: 2
   persistentVolume:
-    storageClassName: "mobilitydb-premium"
     accessModes:
       - ReadWriteOnce
     size: 100Gi
-  # Anti-affinity to ensure each worker runs on separate node
-  # affinity:
-  #   podAntiAffinity:
-  #     requiredDuringSchedulingIgnoredDuringExecution:
-  #       - labelSelector:
-  #           matchExpressions:
-  #             - key: component
-  #               operator: In
-  #               values: ["manager", "coordinator", "worker"]
-  #         topologyKey: kubernetes.io/hostname
+  # # Anti-affinity to ensure each worker runs on separate node
+  affinity:
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - labelSelector:
+            matchExpressions:
+              - key: component
+                operator: In
+                values: ["manager", "coordinator", "worker"]
+          topologyKey: kubernetes.io/hostname
 
 postgres:
   user: postgres
@@ -56,8 +53,3 @@ externalService:
   name: mobilitydb-external-service
   port: 5432
   portName: postgres
-
-ingress:
-  enabled: false
-  hosts: []
-  tls: false

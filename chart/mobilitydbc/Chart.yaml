@@ -1,6 +1,3 @@
 apiVersion: v2
-name: mobilitydbc-cluster
-description: A Helm chart for deploying MobilityDB+Citus cluster for benchmarking
-type: application
+name: ba-mobilitydbc
 version: 0.1.0
-appVersion: "latest"

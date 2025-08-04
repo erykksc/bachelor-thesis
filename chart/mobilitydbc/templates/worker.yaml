@@ -61,22 +61,27 @@ spec:
               value: /var/lib/postgresql/data/pgdata
             # PostgreSQL performance tuning for MobilityDB
             - name: POSTGRES_INITDB_ARGS
-              value: "-c statement_timeout=300000 -c work_mem=512MB -c shared_buffers=2GB -c max_connections=1010"
+              value: "-c statement_timeout=300000 -c work_mem=512MB -c shared_buffers=4GB -c max_connections=1010"
           ports:
             - containerPort: 5432
               protocol: TCP
           volumeMounts:
             - name: postgresql-data
               mountPath: /var/lib/postgresql/data
-          {{- with .Values.worker.resources }}
-          resources:
-            {{- toYaml . | nindent 12 }}
-          {{- end }}
-      volumes:
-        - name: postgresql-data
-          emptyDir:
-            medium: ""  # Use node filesystem instead of memory
       {{- with .Values.worker.affinity }}
       affinity:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+  volumeClaimTemplates:
+    - metadata:
+        name: postgresql-data
+        labels:
+          {{- include "mobilitydbc-cluster.labels" . | nindent 10 }}
+          component: worker
+      spec:
+        accessModes:
+          {{- toYaml .Values.worker.persistentVolume.accessModes | nindent 10 }}
+        storageClassName: {{ .Values.storageClassName }}
+        resources:
+          requests:
+            storage: {{ .Values.worker.persistentVolume.size }}

@@ -67,7 +67,16 @@ spec:
           volumeMounts:
             - name: postgresql-data
               mountPath: /var/lib/postgresql/data
-      volumes:
-        - name: postgresql-data
-          emptyDir:
-            medium: ""  # Use node filesystem instead of memory
+  volumeClaimTemplates:
+    - metadata:
+        name: postgresql-data
+        labels:
+          {{- include "mobilitydbc-cluster.labels" . | nindent 10 }}
+          component: coordinator
+      spec:
+        accessModes:
+          {{- toYaml .Values.coordinator.persistentVolume.accessModes | nindent 10 }}
+        storageClassName: {{ .Values.storageClassName }}
+        resources:
+          requests:
+            storage: {{ .Values.coordinator.persistentVolume.size }}

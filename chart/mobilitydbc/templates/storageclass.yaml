@@ -1,14 +1,10 @@
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
-  labels:
-    {{- include "mobilitydbc-cluster.labels" . | nindent 4 }}
-    storage-tier: premium
-    volume-type: ssd
-  name: {{ .Values.persistentVolume.storageClassName }}
+  name: my-azure-storageclass
+provisioner: disk.csi.azure.com
 parameters:
-  kind: Managed
-  storageaccounttype: Premium_LRS
-provisioner: kubernetes.io/azure-disk
+  skuName: Premium_LRS
 reclaimPolicy: Delete
-volumeBindingMode: Immediate
+volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true
