@@ -455,7 +455,7 @@ func importEventsIntoTripSummaries(ctx context.Context, connString string) error
 
 	// First, get total number of distinct trips
 	var totalTrips int
-	err = conn.QueryRow(ctx, "SELECT COUNT(DISTINCT trip_id) FROM escooter_events").Scan(&totalTrips)
+	err = conn.QueryRow(ctx, "SELECT COUNT(*) FROM ( SELECT trip_id FROM escooter_events GROUP BY trip_id) sub;").Scan(&totalTrips)
 	if err != nil {
 		return fmt.Errorf("Getting total trip count: %w", err)
 	}
@@ -466,7 +466,7 @@ func importEventsIntoTripSummaries(ctx context.Context, connString string) error
 	batchSize := 1000
 	totalBatches := (totalTrips + batchSize - 1) / batchSize
 
-	for batch := 0; batch < totalBatches; batch++ {
+	for batch := range totalBatches {
 		offset := batch * batchSize
 
 		logger.Info("Processing batch", "batch", batch+1, "totalBatches", totalBatches, "offset", offset)
