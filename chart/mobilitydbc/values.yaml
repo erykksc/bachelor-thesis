@@ -5,7 +5,7 @@ coordinator:
   persistentVolume:
     accessModes:
       - ReadWriteOnce
-    size: 100Gi
+    size: 128Gi
 
 manager:
   # put it on the same node as coordinator
@@ -24,7 +24,7 @@ worker:
   persistentVolume:
     accessModes:
       - ReadWriteOnce
-    size: 100Gi
+    size: 128Gi
   # # Anti-affinity to ensure each worker runs on separate node
   affinity:
     podAntiAffinity:
