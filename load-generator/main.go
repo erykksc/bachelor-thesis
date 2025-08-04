@@ -128,20 +128,6 @@ func main() {
 
 	logger.Info("Log file created", "logFile", logFilePath)
 
-	logger.Info("Starting load-generator with following cli arguments",
-		"db", *dbTargetStr,
-		"localities", *localitiesPath,
-		"pois", *poisPath,
-		"trips", *tripsPath,
-		"migrations", *migrationsDir,
-		"mode", *mode,
-		"nworkers", *numWorkers,
-		"log", *logLevel,
-		"queries-per-worker", *numQueries,
-		"seed", *randomSeed,
-		"qtemplates", *queriesFilepath,
-	)
-
 	var dbTarget DBTarget
 	switch *dbTargetStr {
 	case "cratedb":
@@ -162,9 +148,27 @@ func main() {
 	switch *mode {
 	case "init":
 		// initialize tables and insert POIs and Localities
+		logger.Info("Starting load-generator with following cli arguments",
+			"mode", *mode,
+			"log", *logLevel,
+			"connString", *connString,
+			"dbTarget", dbTarget.String(),
+			"pois", *poisPath,
+			"localities", *localitiesPath,
+			"migrations", *migrationsDir,
+		)
 		mustInitializeDb(ctx, *connString, dbTarget, pois, localities, *migrationsDir)
 
 	case "insert":
+		logger.Info("Starting load-generator with following cli arguments",
+			"mode", *mode,
+			"log", *logLevel,
+			"db", dbTarget.String(),
+			"nworkers", *numWorkers,
+			"batchSize", *batchSize,
+			"useBulkInsert", *useBulkInsert,
+			"trips", *tripsPath,
+		)
 		csvFile := createInsertCSVFile(dbTarget, *numWorkers, *batchSize, *useBulkInsert, *tripsPath)
 		defer csvFile.Close()
 		csvWriter := csv.NewWriter(csvFile)
@@ -173,6 +177,19 @@ func main() {
 		benchmarkInserts(ctx, *connString, *numWorkers, *batchSize, *useBulkInsert, dbTarget, *tripsPath, csvWriter)
 
 	case "query":
+		logger.Info("Starting load-generator with following cli arguments",
+			"mode", *mode,
+			"log", *logLevel,
+			"connString", *connString,
+			"nworkers", *numWorkers,
+			"dbTarget", dbTarget.String(),
+			"trips", *tripsPath,
+			"localities", *localitiesPath,
+			"pois", *poisPath,
+			"qtemplates", *queriesFilepath,
+			"numQueries", *numQueries,
+			"seed", *randomSeed,
+		)
 		queryTemplates := mustLoadTemplates(*queriesFilepath)
 		logger.Info("Loaded read queries templates", "count", len(queryTemplates.Templates()))
 
