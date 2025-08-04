@@ -30,7 +30,7 @@ func benchmarkInserts(ctx context.Context, connString string, numWorkers int, ba
 	// create specified number of workers
 	var wg sync.WaitGroup
 	readyStatus := make(chan int, numWorkers)
-	jobs := make(chan []TripEvent, numWorkers*5) // batches of events
+	jobs := make(chan []TripEvent, numWorkers*2) // batches of events
 	successCh := make(chan int, numWorkers)
 	failureCh := make(chan int, numWorkers)
 	eventCh := make(chan InsertEvent, numWorkers*10)
@@ -277,8 +277,12 @@ func insertWorker(ctx context.Context, id int, tripEventBatches <-chan []TripEve
 			if useBulkInsert {
 				insertQuery := bulkInsertEventSql(batch)
 				res, err := conn.Exec(ctx, insertQuery)
-				insertedInQuery += int(res.RowsAffected())
-				logger.Debug("Bulk inserted trip events", "worker", id, "rowsAffected", res.RowsAffected(), "error", err)
+				if err != nil {
+					logger.Warn("Error whil inserting escooter events batch", "worker", id, "error", err)
+				} else {
+					insertedInQuery += int(res.RowsAffected())
+					logger.Debug("Bulk inserted trip events", "worker", id, "rowsAffected", res.RowsAffected())
+				}
 			} else {
 				// Use pgx batch for efficient batch inserts
 				pgxBatch := &pgx.Batch{}

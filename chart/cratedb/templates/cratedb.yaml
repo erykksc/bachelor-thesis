@@ -14,3 +14,21 @@ spec:
         replicas: {{ .Values.replicas }}
         resources: 
           {{- toYaml .Values.resources | nindent 10 }}
+  users:
+    - name: researcher
+      password:
+        secretKeyRef:
+          name: researcher-password
+          key: password
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: researcher-password
+  labels:
+    operator.cloud.crate.io/user-password: "true"
+type: Opaque
+data:
+  password: YmFjaGVsb3J0aGVzaXM=  # base64-encoded "bachelorthesis"
+
