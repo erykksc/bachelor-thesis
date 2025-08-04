@@ -1,4 +1,4 @@
--- Trip events (equivalent to GetTripEvents)
+-- Trip events
 {{define "GetTripEvents"}}
 SELECT geo_point, timestamp AS instant
 FROM escooter_events
@@ -6,21 +6,31 @@ WHERE trip_id = '{{.TripID}}'
 ORDER BY timestamp;
 {{end}}
 
--- Start and end timestamp of a trip (equivalent to TripFirstAndLastEvent)
+-- Start and end timestamp of a trip
 {{define "TripFirstAndLastEvent"}}
-SELECT start_time, end_time
-FROM trip_summaries
+SELECT 
+    MIN(timestamp) AS start_time, 
+    MAX(timestamp) AS end_time
+FROM escooter_events
 WHERE trip_id = '{{.TripID}}';
 {{end}}
 
--- Length of a trip (equivalent to LengthOfTrip)
+-- Length of a trip
 {{define "LengthOfTrip"}}
-SELECT trip_length_m AS tripLengthInMeters
-FROM trip_summaries
-WHERE trip_id = '{{.TripID}}';
+WITH trip_segments AS (
+    SELECT 
+        geo_point,
+        LEAD(geo_point) OVER (ORDER BY timestamp) AS next_point
+    FROM escooter_events
+    WHERE trip_id = '{{.TripID}}'
+)
+SELECT 
+    COALESCE(SUM(distance(geo_point, next_point)), 0) AS tripLengthInMeters
+FROM trip_segments
+WHERE next_point IS NOT NULL;
 {{end}}
 
--- Average speed of trip in Km/h (equivalent to AverageSpeedOfTrip) - optimized version
+-- Average speed of trip in Km/h
 {{define "AverageSpeedOfTrip"}}
 WITH trip_points AS (
   SELECT timestamp, geo_point,
@@ -45,7 +55,7 @@ SELECT
 FROM speed_segments;
 {{end}}
 
--- POIs within radius of the trip trajectory (equivalent to PoisWithinRadiusDuringTrip)
+-- POIs within radius of the trip trajectory
 {{define "PoisWithinRadiusDuringTrip"}}
 SELECT DISTINCT p.*
 FROM escooter_events e
@@ -54,23 +64,35 @@ JOIN pois p
 WHERE e.trip_id = '{{.TripID}}';
 {{end}}
 
--- Trip's start locality (equivalent to TripStartingLocality) - optimized with LIMIT
+-- Trip's start locality
 {{define "TripStartingLocality"}}
-SELECT ts.trip_id, l.name AS start_locality
-FROM trip_summaries ts
-JOIN localities l ON within(ts.start_point, l.geo_shape)
-WHERE ts.trip_id = '{{.TripID}}';
+WITH trip_start AS (
+    SELECT geo_point AS start_point
+    FROM escooter_events
+    WHERE trip_id = '{{.TripID}}'
+    ORDER BY timestamp ASC
+    LIMIT 1
+)
+SELECT '{{.TripID}}' AS trip_id, l.name AS start_locality
+FROM trip_start ts
+JOIN localities l ON within(ts.start_point, l.geo_shape);
 {{end}}
 
--- Trip's end locality (equivalent to TripEndLocality) - optimized with LIMIT
+-- Trip's end locality
 {{define "TripEndLocality"}}
-SELECT ts.trip_id, l.name AS end_locality
-FROM trip_summaries ts
-JOIN localities l ON within(ts.end_point, l.geo_shape)
-WHERE ts.trip_id = '{{.TripID}}';
+WITH trip_end AS (
+    SELECT geo_point AS end_point
+    FROM escooter_events
+    WHERE trip_id = '{{.TripID}}'
+    ORDER BY timestamp DESC
+    LIMIT 1
+)
+SELECT '{{.TripID}}' AS trip_id, l.name AS end_locality
+FROM trip_end te
+JOIN localities l ON within(te.end_point, l.geo_shape);
 {{end}}
 
--- POIs close to the end of a trip (equivalent to PoisCloseToEndDestination)
+-- POIs close to the end of a trip
 {{define "PoisCloseToEndDestination"}}
 SELECT p.poi_id, p.name, distance(p.geo_point, e.geo_point) AS distance
 FROM (

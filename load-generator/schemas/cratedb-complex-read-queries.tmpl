@@ -1,5 +1,38 @@
--- Data summaries (equivalent to DataSummaries)
+-- Data summaries
 {{define "DataSummaries"}}
+WITH trip_metrics AS (
+  SELECT 
+    trip_id,
+    MIN(timestamp) AS start_time,
+    MAX(timestamp) AS end_time,
+    EXTRACT(EPOCH FROM (MAX(timestamp) - MIN(timestamp))) AS trip_duration_s,
+    COUNT(*) AS point_count
+  FROM escooter_events
+  GROUP BY trip_id
+  HAVING MIN(timestamp) BETWEEN '{{.StartTime}}' AND '{{.EndTime}}'
+),
+trip_lengths AS (
+  SELECT 
+    tm.trip_id,
+    tm.trip_duration_s,
+    tm.point_count,
+    COALESCE(SUM(
+      CASE 
+        WHEN ts.next_point IS NOT NULL 
+        THEN distance(ts.geo_point, ts.next_point) 
+        ELSE 0 
+      END
+    ), 0) AS trip_length_m
+  FROM trip_metrics tm
+  JOIN (
+    SELECT 
+      trip_id,
+      geo_point,
+      LEAD(geo_point) OVER (PARTITION BY trip_id ORDER BY timestamp) AS next_point
+    FROM escooter_events
+  ) ts ON tm.trip_id = ts.trip_id
+  GROUP BY tm.trip_id, tm.trip_duration_s, tm.point_count
+)
 SELECT 
   MIN(trip_length_m) AS minLength,
   MAX(trip_length_m) AS maxLength,
@@ -10,11 +43,10 @@ SELECT
   MIN(point_count) AS minPoints,
   MAX(point_count) AS maxPoints,
   AVG(point_count) AS avgPoints
-FROM trip_summaries
-WHERE start_time BETWEEN '{{.StartTime}}' AND '{{.EndTime}}';
+FROM trip_lengths;
 {{end}}
 
--- Trips in locality (equivalent to TripsInLocality)
+-- Trips in locality
 {{define "TripsInLocality"}}
 SELECT DISTINCT e.trip_id
 FROM escooter_events e
@@ -24,7 +56,7 @@ WHERE l.locality_id = '{{.LocalityId}}'
   AND e.timestamp BETWEEN '{{.StartTime}}' AND '{{.EndTime}}';
 {{end}}
 
--- N closest trips to POI (equivalent to NClosestTripsToPoi)
+-- N closest trips to POI
 {{define "NClosestTripsToPoi"}}
 SELECT 
   e.trip_id, 
@@ -37,14 +69,37 @@ ORDER BY distance ASC
 LIMIT {{.Limit}};
 {{end}}
 
--- Trips starting and ending in different localities (equivalent to StartEndInDifferentLocalities)
+-- Trips starting and ending in different localities
 {{define "StartEndInDifferentLocalities"}}
+WITH trip_bounds AS (
+  SELECT 
+    trip_id,
+    MIN(timestamp) AS start_time,
+    MAX(timestamp) AS end_time
+  FROM escooter_events
+  GROUP BY trip_id
+  HAVING MIN(timestamp) BETWEEN '{{.StartTime}}' AND '{{.EndTime}}'
+),
+trip_start_points AS (
+  SELECT DISTINCT
+    e.trip_id,
+    e.geo_point AS start_point
+  FROM escooter_events e
+  JOIN trip_bounds tb ON e.trip_id = tb.trip_id AND e.timestamp = tb.start_time
+),
+trip_end_points AS (
+  SELECT DISTINCT
+    e.trip_id,
+    e.geo_point AS end_point
+  FROM escooter_events e
+  JOIN trip_bounds tb ON e.trip_id = tb.trip_id AND e.timestamp = tb.end_time
+)
 SELECT COUNT(*)
-FROM trip_summaries ts
-JOIN localities s ON within(ts.start_point, s.geo_shape)
-JOIN localities e ON within(ts.end_point, e.geo_shape)
-WHERE s.locality_id <> e.locality_id
-  AND ts.start_time BETWEEN '{{.StartTime}}' AND '{{.EndTime}}';
+FROM trip_start_points tsp
+JOIN trip_end_points tep ON tsp.trip_id = tep.trip_id
+JOIN localities s ON within(tsp.start_point, s.geo_shape)
+JOIN localities e ON within(tep.end_point, e.geo_shape)
+WHERE s.locality_id <> e.locality_id;
 {{end}}
 
 {{define "EventDensityHeatmapPerLocality"}}
@@ -59,14 +114,22 @@ ORDER BY l.name, hour;
 {{end}}
 
 {{define "TripDurationsPerLocality"}}
+WITH trip_durations AS (
+  SELECT 
+    trip_id,
+    MIN(timestamp) AS start_time,
+    EXTRACT(EPOCH FROM (MAX(timestamp) - MIN(timestamp))) AS trip_duration_s
+  FROM escooter_events
+  GROUP BY trip_id
+  HAVING MIN(timestamp) BETWEEN '{{.StartTime}}' AND '{{.EndTime}}'
+    AND EXTRACT(EPOCH FROM (MAX(timestamp) - MIN(timestamp))) > 60
+)
 SELECT l.name AS locality,
-       AVG(ts.trip_duration_s) AS avg_duration_secs
-FROM trip_summaries ts
-JOIN escooter_events e ON e.trip_id = ts.trip_id
+       AVG(td.trip_duration_s) AS avg_duration_secs
+FROM trip_durations td
+JOIN escooter_events e ON e.trip_id = td.trip_id
 JOIN localities l ON within(e.geo_point, l.geo_shape)
-WHERE ts.start_time BETWEEN '{{.StartTime}}' AND '{{.EndTime}}'
-  AND ts.trip_duration_s > 60
-  AND e.timestamp BETWEEN '{{.StartTime}}' AND '{{.EndTime}}'
+WHERE e.timestamp BETWEEN '{{.StartTime}}' AND '{{.EndTime}}'
 GROUP BY l.name
 ORDER BY avg_duration_secs DESC
 {{end}}

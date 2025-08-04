@@ -11,6 +11,7 @@ NCOMPLEX_QUERIES=100000000000 # 100 billion queries, it should be impossible to 
 NSIMPLE_QUERIES=100000000000 # 100 billion queries
 TRIPS='../dataset-generator/output/escooter-trips-large.csv'
 QRS_TIMEOUT='25m'
+WAIT_BETWEEN_STEPS=180
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -21,6 +22,7 @@ while [[ $# -gt 0 ]]; do
     --nworkers) NWORKERS="$2"; shift ;;
     --trips) TRIPS="$2"; shift ;;
     --queries-timeout) QRS_TIMEOUT="$2"; shift ;;
+    --wait-between-steps) WAIT_BETWEEN_STEPS="$2"; shift ;;
     *) echo "Unknown option $1"; exit 1 ;;
   esac
   shift
@@ -41,24 +43,30 @@ go run . --mode insert \
   --bulk-insert \
   --trips $TRIPS
 
-sleep 180
+sleep $WAIT_BETWEEN_STEPS
 
 # Simple queries
-timeout --signal=INT $QRS_TIMEOUT go run . --mode query \
-  --dbTarget $DB_TARGET \
-  --db $DB_CONN_STR \
-  --nworkers $NWORKERS \
-  --queries "./schemas/$DB_TARGET-simple-read-queries.tmpl" \
-  --nqueries $NSIMPLE_QUERIES \
-  --trips $TRIPS
+if !  timeout --signal=INT $QRS_TIMEOUT go run . --mode query \
+    --dbTarget $DB_TARGET \
+    --db $DB_CONN_STR \
+    --nworkers $NWORKERS \
+    --queries "./schemas/$DB_TARGET-simple-read-queries.tmpl" \
+    --nqueries $NSIMPLE_QUERIES \
+    --trips $TRIPS 
+then
+  :
+fi
 
-sleep 180
+sleep $WAIT_BETWEEN_STEPS
 
 # Complex queries
-timeout --signal=INT $QRS_TIMEOUT go run . --mode query \
-  --dbTarget $DB_TARGET \
-  --db $DB_CONN_STR \
-  --nworkers $NWORKERS \
-  --queries "./schemas/$DB_TARGET-complex-read-queries.tmpl" \
-  --nqueries $NCOMPLEX_QUERIES \
-  --trips $TRIPS
+if ! timeout --signal=INT $QRS_TIMEOUT go run . --mode query \
+      --dbTarget $DB_TARGET \
+      --db $DB_CONN_STR \
+      --nworkers $NWORKERS \
+      --queries "./schemas/$DB_TARGET-complex-read-queries.tmpl" \
+      --nqueries $NCOMPLEX_QUERIES \
+      --trips $TRIPS
+then
+  :
+fi

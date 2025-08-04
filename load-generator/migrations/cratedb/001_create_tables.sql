@@ -1,7 +1,6 @@
 DROP TABLE IF EXISTS escooter_events;
 DROP TABLE IF EXISTS pois;
 DROP TABLE IF EXISTS localities;
-DROP TABLE IF EXISTS trip_summaries;
 
 CREATE TABLE IF NOT EXISTS escooter_events (
     event_id    TEXT,
@@ -14,18 +13,6 @@ CLUSTERED BY (trip_id) INTO 20 SHARDS
 WITH ("number_of_replicas" = 0);
 
 
-CREATE TABLE IF NOT EXISTS trip_summaries (
-    trip_id         TEXT PRIMARY KEY,
-    start_time      TIMESTAMP,
-    end_time        TIMESTAMP,
-    start_point     GEO_POINT,
-    end_point       GEO_POINT,
-    trip_length_m   REAL,
-    trip_duration_s REAL,
-    point_count     INTEGER
-)
-CLUSTERED BY (trip_id) INTO 20 SHARDS
-WITH ("number_of_replicas" = 0);
 
 
 CREATE TABLE IF NOT EXISTS pois (

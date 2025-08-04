@@ -121,7 +121,7 @@ Waiting4Workers:
 	for {
 		select {
 		case <-ctx.Done():
-			return
+			break Waiting4Workers
 		case readyWorkerId := <-readyStatus:
 			logger.Debug("Worker reported ready", "id", readyWorkerId)
 			workersReady += 1
