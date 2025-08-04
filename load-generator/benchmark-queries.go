@@ -31,7 +31,7 @@ type QueryEvent struct {
 	ErrorMsg           string
 }
 
-func benchmarkQueries(ctx context.Context, connString string, numWorkers int, dbTarget DBTarget, tripEventsCSV string, localities []Locality, pois []POI, queryTemplates *template.Template, numQueries int, seed int64, csvWriter *csv.Writer) {
+func benchmarkQueries(ctx context.Context, connString string, numWorkers int, dbTarget DBTarget, tevents string, localities []Locality, pois []POI, queryTemplates *template.Template, numQueries int, seed int64, csvWriter *csv.Writer) {
 	logger.Info("Starting Query Benchmark",
 		"dbConnString", connString,
 		"numWorkers", numWorkers,
@@ -40,7 +40,7 @@ func benchmarkQueries(ctx context.Context, connString string, numWorkers int, db
 		"seed", seed,
 	)
 
-	tripIds := ReadTripIds(ctx, tripEventsCSV)
+	tripIds := ReadTripIds(ctx, tevents)
 
 	// Create field generator
 	generator := NewQueryFieldGenerator(seed, localities, pois, tripIds)

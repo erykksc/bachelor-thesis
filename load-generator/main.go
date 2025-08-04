@@ -88,7 +88,6 @@ func main() {
 		numQueries      = flag.Int("nqueries", 100, "Number of queries to execute")
 		randomSeed      = flag.Int64("seed", 42, "Random seed for deterministic query generation")
 		queriesFilepath = flag.String("queries", "./schemas/cratedb-simple-read-queries.tmpl", "Path to a file containing query templates")
-		tripEventsCSV   = flag.String("tevents", "../dataset-generator/output/escooter-trips-small.csv", "Path to a CSV file containing trip events")
 	)
 	flag.Parse()
 
@@ -141,7 +140,6 @@ func main() {
 		"queries-per-worker", *numQueries,
 		"seed", *randomSeed,
 		"qtemplates", *queriesFilepath,
-		"tevents", *tripEventsCSV,
 	)
 
 	var dbTarget DBTarget
@@ -183,7 +181,7 @@ func main() {
 		csvWriter := csv.NewWriter(csvFile)
 		defer csvWriter.Flush()
 
-		benchmarkQueries(ctx, *connString, *numWorkers, dbTarget, *tripEventsCSV, localities, pois, queryTemplates, *numQueries, *randomSeed, csvWriter)
+		benchmarkQueries(ctx, *connString, *numWorkers, dbTarget, *tripsPath, localities, pois, queryTemplates, *numQueries, *randomSeed, csvWriter)
 
 	default:
 		logger.Error("unknown mode", "mode", *mode)

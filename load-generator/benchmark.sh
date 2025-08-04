@@ -49,7 +49,8 @@ timeout --signal=INT $QRS_TIMEOUT go run . --mode query \
   --db $DB_CONN_STR \
   --nworkers $NWORKERS \
   --queries "./schemas/$DB_TARGET-simple-read-queries.tmpl" \
-  --nqueries $NSIMPLE_QUERIES
+  --nqueries $NSIMPLE_QUERIES \
+  --trips $TRIPS
 
 sleep 180
 
@@ -59,4 +60,5 @@ timeout --signal=INT $QRS_TIMEOUT go run . --mode query \
   --db $DB_CONN_STR \
   --nworkers $NWORKERS \
   --queries "./schemas/$DB_TARGET-complex-read-queries.tmpl" \
-  --nqueries $NCOMPLEX_QUERIES
+  --nqueries $NCOMPLEX_QUERIES \
+  --trips $TRIPS
