@@ -105,10 +105,29 @@ func main() {
 		os.Exit(1)
 	}
 
-	handler := slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+	os.MkdirAll("./logs", 0777)
+
+	// Create log filename with timestamp and CLI arguments
+	timestamp := time.Now().Format("20060102_150405")
+	logFilename := fmt.Sprintf("load-generator_%s_%s_%s_%dw.log",
+		*mode, *dbTargetStr, timestamp, *numWorkers)
+	logFilePath := path.Join("logs", logFilename)
+
+	// Create log file
+	logFile, err := os.Create(logFilePath)
+	if err != nil {
+		fmt.Printf("Failed to create log file: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Create multi-writer for both stdout and file
+	multiWriter := io.MultiWriter(os.Stdout, logFile)
+	handler := slog.NewJSONHandler(multiWriter, &slog.HandlerOptions{
 		Level: level,
 	})
 	logger = slog.New(handler)
+
+	logger.Info("Log file created", "logFile", logFilePath)
 
 	logger.Info("Starting load-generator with following cli arguments",
 		"db", *dbTargetStr,

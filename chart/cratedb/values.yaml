@@ -5,7 +5,7 @@ version: 5.10.11
 resources:
   requests:
     cpu: 3
-    memory: "15Gi"
+    memory: "14Gi"
   limits:
     cpu: 4
     memory: "16Gi"
