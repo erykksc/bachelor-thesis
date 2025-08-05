@@ -3,49 +3,48 @@
 
 The research topic proved to have great depth and there are limitations to the experiment we have performed.
 
-The benchmarked cluster configurations were limited, clusters of bigger sizes should also be evaluated, such as cluster of size 40.
-We were not able to do it due to limited resources, time constraint, and lack of Google Cloud Platform tokens, which have not been issued to the University recently.
-Additionally we could have evaluated a wider range of cluster sizes with different VM sizes for nodes.
-This would additionally lead to more reliable findings, as the amount of interpolation between the performance points would be smaller.
-One could also test how would the systems perform with different storage classes than Premium\_LRS.
-Furthermore we could benchmark the vertical scalability of both DDMBS by deploying it on diverse set of VM sizes.
+The benchmarked cluster configurations were limited, clusters of bigger sizes should also be evaluated, such as cluster of size 24.
+We were not able to do it due to time constraints and limited resources due to lack of Google Cloud Platform tokens, which have not been issued to the University recently.
+This would additionally lead to more reliable scalability findings.
+Additionally we could have evaluated clusters with different VM sizes for nodes to benchmark the vertical scalability of the systems.
+One could also test how would the systems perform with different storage classes.
 
 We could have also repeated the benchmark over a longer time-frame in order to minimize the variance of the Cloud performance
-(i.e., running the benchmarks in different weeks or months on different times over a few months).
+(i.e., running the benchmarks in different weeks or months on different times over a few months in order to enhance reproducibility).
 
 Future research could also look into whether change in the hardware of each node would play a role in scalability 
-(i.e., whether improving the hardware of certain nodes, like coordinator in MDBC, would influence the scalability patterns).
+(i.e., whether improving the hardware of certain nodes, like coordinator in MDBC, would influence the scalability pattern).
+MDBC has a dedicated coordinator node which does not serve data directly, while in CrateDB all nodes participate and act as workers by default (this behavior is configurable).\footnote{\url{https://cratedb.com/docs/crate/reference/en/latest/config/node.html}}
+We have decided not to give an extra node to MobilityDBC in order to keep the benchmark fair.
+In real life deployment one can decide to add an extra coordinator node with less resources, as the Citus docs showcase\footnote{\url{[CITATION]}}.
+One could also setup multiple coordinator nodes and load balance between them to and benchmark such setup.
 
-We could have also tested a wider range of concurrent client connections to the systems, in order to test how do the systems handle larger amount of simultaneous clients.
-We tried increasing the number of concurrent clients, but have discovered that DBMS start to drop connections on too high load.
-As our load-generator doesn't support reconnection in worker threads, we have decided not to benchmark it as the results would have little value.
+We could have also benchmarked a wider range of concurrent connections to the systems.
+We tried increasing the number of concurrent clients to 512, but have discovered that CrateDB started to drop connections during querying on 3 node cluster.
+Our load-generator implementation does not support reconnection in worker threads, so we have decided not to benchmark larger amount of concurrent clients as the results would have little value.
 We could have implemented the reconnection mechanism but due to time constrains we were not able to.
-Additionally we could have evaluated the performance of different query types, such as updates and deletes, but due to time constraint we were not able to implement this functionality to the load-generator.
-Furthermore, one could benchmark a more realistic workload, such as a trace based one instead of micro-benchmark or a mixed workload such as Yahoo Cloud Serving Benchmark (YCSB) [CITATION].
 
-It would be worth benchmarking, how the systems perform when replication is configured and enabled.
-We did not benchmark it as the MDBC does not support replication natively and additional extensions are required.
+Additionally we could have evaluated the performance of different query types, such as updates and deletes, but due to time constraint we were not able to add this functionality to the load-generator.
+Furthermore, one could benchmark more realistic workload than synthetic micro-benchmark, such as a trace based ones or use a mixed workload such as Yahoo Cloud Serving Benchmark (YCSB) [CITATION].
+
+It is also worth evaluating, how the systems perform when replication is configured and enabled.
+We did not benchmark it as the MDBC does not support replication natively and additional extensions are required, and we aimed to benchmark the systems under optimal conditions.
 
 Consistency has not been evaluated, as MDBC supports ACID compliant transactions and CrateDB guarantees only eventual consistency.
-Future research could check how much time does CrateDB need to get into consistent state.
-Our implementation giving both DBMS systems 3 minutes rest between inserts and start of querying is not proven to be reliable.
+Future research could check the latency of CrateDB reaching its consistent state.
 One could also evaluate the performance and scalability of MDBC with transactions and without them.
 
 As we were new to both DDBMS we could have overlooked possible query optimizations.
 An experienced user of those systems might be able to get more performance of the same cluster sizes and possibly narrow the gap between CrateDB and MDBC querying performance.
-Nonetheless, the goal of this thesis was to benchmark the scalability of both DDBMS and we have done that.
+Nonetheless, the goal of this thesis was to benchmark the scalability of both DDBMS and we have accomplished that goal.
 
-It would be worth finding out what is the possible storage optimization gains in MDBC.
-As MDBC automatically discards data fields on the trajectory that can be interpolated.
-CrateDB also supports interpolation of values, but at the time of writing the geospatial values are not interoperable.
+It would also be worth to find out what are the possible storage optimization gains in MDBC, as it allows to identify and discard redundant observations from the trajectory data 
+(i.e., allows to remove data-points which can be interpolated).\footnote{\url{https://mobilitydb.com/project.html}}
+CrateDB also supports interpolation of time-series data, but at the time of writing it does not support interpolation of geospatial points.
 
-Future research could also look into how does the VM size of coordinator node in MDBC play a role.
-MDBC has a dedicated node for just being a coordinator which does not serve data directly while in CrateDB all nodes participate and act as workers by default.
-We have decided not to give an extra node to MobilityDBC in order to keep the benchmark fair.
-In real life deployment one can decide to add an extra coordinator node with less resources, as the Citus docs say\footnote{\url{[CITATION]}}, as the coordinator node does not require much performance.
-One can also setup multiple coordinator nodes and load balance between them to and benchmark such setup.
 
-Additionally, it is worth to find out what is the overhead of hosting those DDMBS on top of Kubernetes cluster compared to running the software of individual nodes directly on the VMs without containerization.
+Additionally, future research could evaluate overhead of hosting those DDMBS on top of Kubernetes cluster compared to running the software of individual nodes directly on VMs without containerization.
 
+% TODO: if time allows
 % There is a big speed difference in iops and thus database performance on PVCs for kubernetes in azure cloud.
 % The disks provided with VMs are much faster otherwise the disk speed (IOPS) depends on the allocated storage
