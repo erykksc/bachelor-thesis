@@ -1,9 +1,63 @@
 \section{Benchmark design for \mobilitydbc and CrateDB}
 \label{cha:benchmarkdesign}
 
-Our benchmark is designed to investigate how CrateDB and \mobilitydbc compare in terms of scalability under spatio-temporal workloads typical for IoT use cases.
+We determined a few requirements for our benchmark design.
+\subsection{Design Requirements}
+
+\subsubsection{Spatiotemporal workload}
+\label{req:spatiotemporal-workload}
+We design a benchmark to investigate how CrateDB and \mobilitydbc compare in spatio-temporal workloads typical for IoT use-cases.
 Spatio-temporal aspects are the primary target of our benchmark, since \mobilitydbc value proposition is exactly that.
+
+By IoT use-cases we understand situations where many client devices send information.
+For example, an e-scooter company has a fleet of e-scooters in the city, where all of them send their current location along with some additional data.
+The same could be applied to public transport, e.g., the buses in a city.
+The DBMS needs to be able to handle multiple connections at the same time as we imagine that in real life scenario there might be many clients that connect to the DBMS.
+For example in a situation where the IoT devices connect to serverless functions which maintain connections with the DBMS.
+
+\subsubsection{Relevancy}
+\label{req:relevancy}
+
+The benchmark needs to be relevant, so that it's results bring value to future research or users trying to decide which DBMS is more suitable for their needs.
+The relevancy for us means that the system is deployed in a way that resembles the potential production deployments in real world.
+The metrics collected are informative for the potential use cases and allow measuring the effectiveness of scaling the systems.
+The workloads resemble the potential real life workloads for those DBMS.
+
+As the title of this thesis says, we want to compare the scalability of the systems i.e., compare what is the performance increase when we add additional resources to the systems. We need to be able to measure whether increasing assigned resources to the system, brings performance gains.
+Those performance gains need to be visible in the collected metrics. 
+
+We need to design the benchmark in such a way that it would allow to change the available resources of the system it is being run against.
+
+\subsubsection{Portability}
+\label{req:portability}
+
+The benchmark needs to be able to be deployed in different environments with little no no changes applied to it.
+This is an important requirement for us as Google has decided to stop supplying credits for Google Cloud Platform to our University.
+Because of the lack of credits it was uncertain whether the benchmark will be run in the Cloud or University's Cluster.
+Additionally because of the lack of resources, we need to be able to develop the benchmark locally on a single machine.
+
+\subsubsection{Reproducibility and Repeatability}
+\label{req:reproducibility-and-repeatability}
+
+\subsubsection{Fairness}
+\label{req:fairness}
+We want both systems to be represented fairly, i.e., we don't want to exaggerate strengths of one system.
+The benchmark needs to fairly represent both systems not 
 Our goal is not to advocate for one system over the other but to investigate their respective strengths and limitations in processing spatio-temporal (ST) data at scale.
+
+
+\subsubsection{Understandability}
+\label{req:understandability}
+We need to write the benchmark in a way that it is understandable for a Computer Science Bachelor Student.
+We need to explain all necessary information and context in this thesis.
+With that said, we should avoid adding steps and workloads to the benchmark that will complicate the understandability without bringing much value.
+It is important to handle the trade-off between understandability and relevancy.
+
+
+\subsection{Design features}
+
+To meet our requirements we designed the benchmark in the following way.
+
 To evaluate scalability, we have designed a benchmark seen in Figure~\ref{fig:benchmark_design}.
 
 \begin{figure}[ht]
@@ -85,18 +139,18 @@ To evaluate scalability, we have designed a benchmark seen in Figure~\ref{fig:be
 \end{figure}
 
 % Designed for cloud
-\subsection{Infrastructure}
-We designed this benchmark to be deployed and run on the cloud for two reasons.
+\subsubsection{Infrastructure}
+We decided that the benchmark will be run in the cloud because of two reasons.
 First, we lacked access to multiple local machines with identical hardware, making resource heterogeneity a concern.
-Second, a cloud-based deployment improves repeatability, as others can reproduce our setup without dedicated hardware.
-Moreover, cloud deployments of distributed databases reflect real-world use cases, making the benchmark more relevant.
+Second, a cloud-based deployment improves repeatability, as others can reproduce our setup without dedicated hardware, meeting part of our repeatability \ref{req:reproducibility-and-repeatability} requirement.
+Moreover, cloud deployments of distributed databases reflect real-world use cases, making the benchmark more relevant, matching our relevancy \ref{req:relevancy} requirement.
 
 % infrastructure as code to allow reproducibility
 To improve reproducibility and repeatability, all parts of the benchmark, including cloud resource definitions and software configuration, are expressed in code.
 Using infrastructure as code allows multiple benchmark runs with the exact same configuration eliminating the risk of manual misconfiguration.
 Additionally, systems having access to the identical resources makes the benchmark and comparison fair.
 
-\subsection{Load generator}
+\subsubsection{Load generator}
 % * this benchmark uses synthetic workload load generator
 We decided to split the benchmark into two major components, the DDBMS cluster and a load generator.
 The load generator simulates concurrent clients on a DDBMS cluster.
@@ -111,14 +165,14 @@ While this reduces workload realism, it improves reproducibility and allows clea
 Load generator is deployed in the cloud as well, close to the SUT instead of running it locally and sending queries through the internet.
 This approach allows us to minimize latency and potential disturbances while the benchmark runs i.e., packet loss due to network problems.
 
-\subsection{DDBMS Clusters}
+\subsubsection{DDBMS Clusters}
 
 Each DDBMS is deployed on a cluster of machines with the same specifications that meet or exceed each system's minimum requirements.
 This allows fair comparison of both systems as they have access to same resources.
 The infrastructure of the cluster is deployed in the cloud using infrastructure as code and the DDBMS is deployed on the infrastructure using an automation tool.
 Using an automation tool allows repeatable deployment of the DDBMS in the same way as infrastructure as code allows repeatable deployment of the resources.
 
-\subsection{Workloads and metrics}
+\subsubsection{Workloads and metrics}
 % * explain which metrics have been chosen and why:
 %   - latency
 %   - throughput
@@ -146,7 +200,7 @@ In this scenario we benchmark the read throughput, as it is a relevant metric fo
 %   - complex queries - important for data analysis, to find out patterns and optimizations (e.g.,used by the e-scooter sharing company)
 (3) Complex read queries, here we try to simulate a scenario of a complex queries used for analysis and optimizations i.e., queries done by the e-scooter company to find patterns in the traffic to optimize the placement of the e-scooter stations throughout a city or to gain insight into their data.
 
-\subsection{Scalability}
+\subsubsection{Scalability}
 % NOTE: multiple sizes of the cluster will be used (2,3,4,5) to establish scalability pattern
 To establish a scalability pattern we vary cluster sizes to evaluate the horizontal scalability.
 Each cluster size is benchmarked using several user pool sizes, simulating different concurrency levels.

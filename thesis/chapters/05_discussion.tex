@@ -1,38 +1,51 @@
 \section{Discussion}
 \label{cha:discussion}
 
+The research topic proved to have great depth and there are limitations to the experiment we have performed.
+
 The benchmarked cluster configurations were limited, clusters of bigger sizes should also be evaluated, such as cluster of size 40.
-We were not able to do it due to limited resources and lack of Google Cloud Platform tokens, which have not been issued to the University recently.
-
-One could also run the benchmarks over a larger time frame i.e., running the benchmarks every day or week on different times for a few months.
-This would reduce the variability of the cloud providers systems, as previous research has demonstrated that the time of the day can impact performance of virtual machines hosted on the cloud. (ADD CITATION)
-
-Future research could also look into whether change in the hardware of each node would play a role in scalability i.e., whether improving the hardware of each node in the cluster would influence the scalability patterns.
-
-Wider range of concurrent client connections to the systems could be benchmarked in order to test how do the systems handle even large amount of simultaneous clients.
+We were not able to do it due to limited resources, time constraint, and lack of Google Cloud Platform tokens, which have not been issued to the University recently.
+Additionally we could have evaluated a wider range of cluster sizes with different VM sizes for nodes.
 This would additionally lead to more reliable findings, as the amount of interpolation between the performance points would be smaller.
+One could also test how would the systems perform with different storage classes than Premium\_LRS.
+Furthermore we could benchmark the vertical scalability of both DDMBS by deploying it on diverse set of VM sizes.
 
-Due to time constraint, we additionally were not able to evaluate performance of different query types, such as updates and deletes.
+We could have also repeated the benchmark over a longer time-frame in order to minimize the variance of the Cloud performance
+(i.e., running the benchmarks in different weeks or months on different times over a few months).
 
-Additionally, the vertical scalability of each system has not been determined and compared.
+Future research could also look into whether change in the hardware of each node would play a role in scalability 
+(i.e., whether improving the hardware of certain nodes, like coordinator in MDBC, would influence the scalability patterns).
 
-Furthermore, a more realistic workload could be benchmarked, such as a trace based one instead of micro-benchmark.
+We could have also tested a wider range of concurrent client connections to the systems, in order to test how do the systems handle larger amount of simultaneous clients.
+We tried increasing the number of concurrent clients, but have discovered that DBMS start to drop connections on too high load.
+As our load-generator doesn't support reconnection in worker threads, we have decided not to benchmark it as the results would have little value.
+We could have implemented the reconnection mechanism but due to time constrains we were not able to.
+Additionally we could have evaluated the performance of different query types, such as updates and deletes, but due to time constraint we were not able to implement this functionality to the load-generator.
+Furthermore, one could benchmark a more realistic workload, such as a trace based one instead of micro-benchmark or a mixed workload such as Yahoo Cloud Serving Benchmark (YCSB) [CITATION].
 
-The systems would also need to be evaluated when nodes of the DDBMS would be running on bare metal servers, not on top of Kubernetes inside docker containers as containerization alongside the Kubernetes overhead could impact the results.
+It would be worth benchmarking, how the systems perform when replication is configured and enabled.
+We did not benchmark it as the MDBC does not support replication natively and additional extensions are required.
 
-It would be worth checking how the systems would perform when replication would be enabled.
-
-Consistency has not been evaluated, as \mobilitydbc supports ACID compliant transactions and CrateDB guarantees only eventual consistency.
+Consistency has not been evaluated, as MDBC supports ACID compliant transactions and CrateDB guarantees only eventual consistency.
 Future research could check how much time does CrateDB need to get into consistent state.
-One could also evaluate the performance and scalability of \mobilitydbc with transactions and without them.
+Our implementation giving both DBMS systems 3 minutes rest between inserts and start of querying is not proven to be reliable.
+One could also evaluate the performance and scalability of MDBC with transactions and without them.
 
-\subsection{Lessons learned}
+As we were new to both DDBMS we could have overlooked possible query optimizations.
+An experienced user of those systems might be able to get more performance of the same cluster sizes and possibly narrow the gap between CrateDB and MDBC querying performance.
+Nonetheless, the goal of this thesis was to benchmark the scalability of both DDBMS and we have done that.
 
-There is a big speed difference in iops and thus database performance on PVCs for kubernetes in azure cloud.
-The disks provided with VMs are much faster otherwise the disk speed (IOPS) depends on the allocated storage
+It would be worth finding out what is the possible storage optimization gains in MDBC.
+As MDBC automatically discards data fields on the trajectory that can be interpolated.
+CrateDB also supports interpolation of values, but at the time of writing the geospatial values are not interoperable.
 
-When sending many single inserts in a batch, the performance of the cratedb has been terrible compared to mobilitydbc.
-This could have been due to some configuration or cratedb is not optimized for this driver and has to parse every request anew.
+Future research could also look into how does the VM size of coordinator node in MDBC play a role.
+MDBC has a dedicated node for just being a coordinator which does not serve data directly while in CrateDB all nodes participate and act as workers by default.
+We have decided not to give an extra node to MobilityDBC in order to keep the benchmark fair.
+In real life deployment one can decide to add an extra coordinator node with less resources, as the Citus docs say\footnote{\url{[CITATION]}}, as the coordinator node does not require much performance.
+One can also setup multiple coordinator nodes and load balance between them to and benchmark such setup.
 
-MobilityDB has more features such as the ability to count the time an object spends near a POI or other object as it is able to interpolate the data.
-Additionally MobilityDB allows data compression as some datapoints can be removed as the interpolation covers them perfectly
+Additionally, it is worth to find out what is the overhead of hosting those DDMBS on top of Kubernetes cluster compared to running the software of individual nodes directly on the VMs without containerization.
+
+% There is a big speed difference in iops and thus database performance on PVCs for kubernetes in azure cloud.
+% The disks provided with VMs are much faster otherwise the disk speed (IOPS) depends on the allocated storage
