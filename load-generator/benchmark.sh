@@ -7,6 +7,7 @@ DB_TARGET="cratedb"
 BATCH_SIZE=2048
 DB_CONN_STR='postgresql://crate:crate@localhost:5432'
 NWORKERS=16
+NWORKERS_COMPLEX=4
 NCOMPLEX_QUERIES=100000000000 # 100 billion queries, it should be impossible to perform so that the timeout is reached
 NSIMPLE_QUERIES=100000000000 # 100 billion queries
 TRIPS='../dataset-generator/output/escooter-trips-large.csv'
@@ -20,6 +21,7 @@ while [[ $# -gt 0 ]]; do
     --db-conn) DB_CONN_STR="$2"; shift ;;
     --batch-size) BATCH_SIZE="$2"; shift ;;
     --nworkers) NWORKERS="$2"; shift ;;
+    --nworkers-complex) NWORKERS_COMPLEX="$2"; shift ;;
     --trips) TRIPS="$2"; shift ;;
     --queries-timeout) QRS_TIMEOUT="$2"; shift ;;
     --wait-between-steps) WAIT_BETWEEN_STEPS="$2"; shift ;;
@@ -63,7 +65,7 @@ sleep $WAIT_BETWEEN_STEPS
 if ! timeout --signal=INT $QRS_TIMEOUT go run . --mode query \
       --dbTarget $DB_TARGET \
       --db $DB_CONN_STR \
-      --nworkers $NWORKERS \
+      --nworkers $NWORKERS_COMPLEX \
       --queries "./schemas/$DB_TARGET-complex-read-queries.tmpl" \
       --nqueries $NCOMPLEX_QUERIES \
       --trips $TRIPS

@@ -7,12 +7,10 @@ CREATE TABLE IF NOT EXISTS escooter_events (
     trip_id     TEXT,
     timestamp   TIMESTAMP,
     geo_point   GEO_POINT,
-    PRIMARY KEY (trip_id, event_id)
+    PRIMARY KEY (trip_id, timestamp, event_id)
 )
 CLUSTERED BY (trip_id) INTO 20 SHARDS
 WITH ("number_of_replicas" = 0);
-
-
 
 
 CREATE TABLE IF NOT EXISTS pois (

@@ -439,8 +439,8 @@ func (g *QueryFieldGenerator) GenerateFields(queryIndex int) QueryFields {
 	rng := rand.New(rand.NewSource(seed))
 
 	// Generate start time first
-	minDuration := int64(3600 * 24 * 6)
-	maxDuration := int64(3600 * 24 * 7)
+	minDuration := int64(3600 * 1)
+	maxDuration := int64(3600 * 2)
 
 	timeRange := g.maxTime.Unix() - g.minTime.Unix()
 	startOffset := rng.Int63n(timeRange - maxDuration)

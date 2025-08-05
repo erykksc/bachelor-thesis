@@ -300,7 +300,7 @@ func createInsertCSVFile(dbTarget DBTarget, numWorkers, batchSize int, useBulkIn
 	}
 
 	filename := fmt.Sprintf("results_insert_%s_%s_%dw_%db_%s_%s.csv",
-		dbTarget.String(), timestamp, numWorkers, batchSize, bulkStr, tripsBasename)
+		dbTarget.String(), tripsBasename, numWorkers, batchSize, bulkStr, timestamp)
 	filename = path.Join("results", filename)
 
 	os.MkdirAll("./results", 0777)
@@ -320,7 +320,7 @@ func createQueryCSVFile(dbTarget DBTarget, numWorkers, numQueries int, queriesPa
 	queriesBasename := strings.TrimSuffix(filepath.Base(queriesPath), filepath.Ext(queriesPath))
 
 	filename := fmt.Sprintf("results_query_%s_%s_%dw_%dq_%s.csv",
-		dbTarget.String(), timestamp, numWorkers, numQueries, queriesBasename)
+		dbTarget.String(), queriesBasename, numWorkers, numQueries, timestamp)
 	filename = path.Join("results", filename)
 
 	os.MkdirAll("./results", 0777)
