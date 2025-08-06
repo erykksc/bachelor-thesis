@@ -40,7 +40,6 @@
 \usepackage{tabularx}
 \newcolumntype{Y}{>{\centering\arraybackslash}X}
 
-
 \renewcommand\thefigure{%
 \thesection.\arabic{figure}}
 \renewcommand\thesubfigure{%
@@ -55,17 +54,16 @@
 \usepackage[noabbrev,capitalise]{cleveref}
 
 \usepackage[
-    maxbibnames=99,
-    style=alphabetic,
-    url=false,
-    backend=biber,
-    sortcites=true,
+  maxbibnames=99,
+  style=alphabetic,
+  url=false,
+  backend=biber,
+  sortcites=true,
 ]{biblatex}
 \addbibresource{refs.bib}
 \DeclareFieldFormat[online]{urldate}{Last accessed: #1}
 \DeclareFieldFormat{eprint}{arXiv: \href{https://arxiv.org/abs/#1}{#1}}
 \DeclareFieldFormat[report]{title}{``#1''}
-
 
 \newcommand{\projectTitle}{Benchmarking the Scalability Behaviour of MobilityDB and CrateDB}
 \newcommand{\thesisType}{Bachelor's Thesis}
@@ -79,7 +77,6 @@
 \newcommand{\projectYear}{2025}
 \newcommand{\facultyName}{Fakultät Elektrotechnik und Informatik}
 \newcommand{\departmentName}{Fachgebiet Scalable Software Systems}
-
 
 \newcommand{\mobilitydbc}{MDBC~} % Other option is MobilityDB-C
 \newcolumntype{P}[1]{>{\centering\arraybackslash}p{#1}}
@@ -104,17 +101,17 @@
 % GERMAN
 \clearpage
 \begin{otherlanguage}
-	{ngerman}
-	\section*{Kurzfassung}
-	% TODO: Translate abstract to german
-	% FaaS ist ein innovatives neues Servicemodell, das sich mit dem aktuellen Vormarsch des Cloud Computing entwickelt hat.
-	% Softwareentwicklende können ihre Anwendungen schneller und mit der erforderlichen Flexibilität und Skalierbarkeit bereitstellen und gleichzeitig den Wartungsaufwand für die Infrastruktur sehr gering halten.
-	% Diese Vorteile sind im Edge-Computing sehr wünschenswert, da sich ständig ändernde Technologien und Anforderungen schnell umgesetzt werden müssen und die Fluktuation und Heterogenität der Service-Consumer ein wichtiger Faktor ist.
-	% Edge-Nodes können jedoch häufig nur einen Bruchteil der Leistung von Cloud-Computing-Infrastruktur bereitstellen, was die Ausführung herkömmlicher FaaS-Plattformen unmöglich macht.
-	% In dieser Arbeit stellen wir einen neuen Ansatz für FaaS eine Platform vor, die von Grund auf unter Berücksichtigung von Edge-Computing- und IoT-Anforderungen entwickelt wurde.
-	% Um den Overhead so gering wie möglich zu halten, nutzen wir CoAP als Messaging-Protokoll und Docker, um Applikationen voneinander zu isolieren, während Container wiederverwendet werden, um die bestmögliche Leistung zu erzielen.
-	% Wir präsentieren auch eine Proof-of-Concept-Implementierung unseres Designs, die wir mit einem eigenen Benchmarking-Tool getestet haben, und vergleichen unsere Ergebnisse mit Benchmarks von Lean OpenWhisk, einer weiteren FaaS-Plattform für die Edge.
-	% Wir stellen fest, dass unsere Plattform Lean OpenWhisk in Bezug auf Latenz und Durchsatz in allen Tests übertreffen kann, Lean OpenWhisk jedoch höhere Erfolgsraten bei einer geringen Anzahl gleichzeitiger Clients aufweist.
+  {ngerman}
+  \section*{Kurzfassung}
+  % TODO: Translate abstract to german
+  % FaaS ist ein innovatives neues Servicemodell, das sich mit dem aktuellen Vormarsch des Cloud Computing entwickelt hat.
+  % Softwareentwicklende können ihre Anwendungen schneller und mit der erforderlichen Flexibilität und Skalierbarkeit bereitstellen und gleichzeitig den Wartungsaufwand für die Infrastruktur sehr gering halten.
+  % Diese Vorteile sind im Edge-Computing sehr wünschenswert, da sich ständig ändernde Technologien und Anforderungen schnell umgesetzt werden müssen und die Fluktuation und Heterogenität der Service-Consumer ein wichtiger Faktor ist.
+  % Edge-Nodes können jedoch häufig nur einen Bruchteil der Leistung von Cloud-Computing-Infrastruktur bereitstellen, was die Ausführung herkömmlicher FaaS-Plattformen unmöglich macht.
+  % In dieser Arbeit stellen wir einen neuen Ansatz für FaaS eine Platform vor, die von Grund auf unter Berücksichtigung von Edge-Computing- und IoT-Anforderungen entwickelt wurde.
+  % Um den Overhead so gering wie möglich zu halten, nutzen wir CoAP als Messaging-Protokoll und Docker, um Applikationen voneinander zu isolieren, während Container wiederverwendet werden, um die bestmögliche Leistung zu erzielen.
+  % Wir präsentieren auch eine Proof-of-Concept-Implementierung unseres Designs, die wir mit einem eigenen Benchmarking-Tool getestet haben, und vergleichen unsere Ergebnisse mit Benchmarks von Lean OpenWhisk, einer weiteren FaaS-Plattform für die Edge.
+  % Wir stellen fest, dass unsere Plattform Lean OpenWhisk in Bezug auf Latenz und Durchsatz in allen Tests übertreffen kann, Lean OpenWhisk jedoch höhere Erfolgsraten bei einer geringen Anzahl gleichzeitiger Clients aufweist.
 \end{otherlanguage}
 
 \clearpage

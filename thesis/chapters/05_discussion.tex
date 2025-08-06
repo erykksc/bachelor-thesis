@@ -14,7 +14,7 @@ We could have also repeated the benchmark over a longer time-frame in order to m
 Furthermore, we could have used the entire generated dataset o 1 Billion e-scooter events instead of a subset of first 100 Million events.
 We chose to only use a subset of events due to time constraint.
 
-Future research could also look into whether change in the hardware of each node would play a role in scalability 
+Future research could also look into whether change in the hardware of each node would play a role in scalability
 (i.e., whether improving the hardware of certain nodes, like coordinator in MobilityDBC, would influence the scalability pattern).
 MobilityDBC has a dedicated coordinator node which does not serve data directly, while in CrateDB all nodes participate and act as workers by default (this behavior is configurable).\footnote{\url{https://cratedb.com/docs/crate/reference/en/latest/config/node.html}}
 We have decided not to give an extra node to MobilityDBC in order to keep the benchmark fair.
@@ -40,10 +40,9 @@ As we were new to both DDBMS we could have overlooked possible query optimizatio
 An experienced user of those systems might be able to get more performance of the same cluster sizes and possibly narrow the gap between CrateDB and MobilityDBC querying performance.
 Nonetheless, the goal of this thesis was to benchmark the scalability of both DDBMS and we have accomplished that goal.
 
-It would also be worth to find out what are the possible storage optimization gains in MobilityDBC, as it allows to identify and discard redundant observations from the trajectory data 
+It would also be worth to find out what are the possible storage optimization gains in MobilityDBC, as it allows to identify and discard redundant observations from the trajectory data
 (i.e., allows to remove data-points which can be interpolated).\footnote{\url{https://mobilitydb.com/project.html}}
 CrateDB also supports interpolation of time-series data, but at the time of writing it does not support interpolation of geospatial points.
-
 
 Additionally, future research could evaluate overhead of hosting those DDMBS on top of Kubernetes cluster compared to running the software of individual nodes directly on VMs without containerization.
 

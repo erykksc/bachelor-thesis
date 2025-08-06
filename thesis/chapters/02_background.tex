@@ -19,23 +19,23 @@ Moving (dynamic) data refers to objects that change their position over time, su
 % NOTE: Spatiotemporal queries
 There are many types of queries that can be performed on spatiotemporal data, here is the list of a common ones.
 \begin{itemize}
-	\item \textbf{Spatiotemporal Range Query:} Retrieves objects or events that occurred within a specific geographic area during a defined time window
-		(e.g., Find all vehicles that were in Berlin between 7:00 and 9:00 on Friday, June 6, 2025).
+  \item \textbf{Spatiotemporal Range Query:} Retrieves objects or events that occurred within a specific geographic area during a defined time window
+    (e.g., Find all vehicles that were in Berlin between 7:00 and 9:00 on Friday, June 6, 2025).
 
-	\item \textbf{Time Slice Query:} Retrieve all objects that are in a specific spatial area at a single point in time
-		(e.g., find all buses that were in Warsaw in Wola district center at 15:00 on Tuesday, July 23, 2025).
+  \item \textbf{Time Slice Query:} Retrieve all objects that are in a specific spatial area at a single point in time
+    (e.g., find all buses that were in Warsaw in Wola district center at 15:00 on Tuesday, July 23, 2025).
 
-	\item \textbf{Window Queries:} Retrieve all objects that intersect a spatial area during a given time window
-		(e.g., find all trains that passed through Berlin Central Station between 10:00 and 12:00 on Wednesday, May 4, 2025).
+  \item \textbf{Window Queries:} Retrieve all objects that intersect a spatial area during a given time window
+    (e.g., find all trains that passed through Berlin Central Station between 10:00 and 12:00 on Wednesday, May 4, 2025).
 
-	\item \textbf{Trajectory Query:} Extracts or analyzes the movement path of an object over time
-		(e.g., show the movement path of a delivery drone as it traveled across Hamburg between 10:00 and 11:00 on Monday, June 2, 2025).
+  \item \textbf{Trajectory Query:} Extracts or analyzes the movement path of an object over time
+    (e.g., show the movement path of a delivery drone as it traveled across Hamburg between 10:00 and 11:00 on Monday, June 2, 2025).
 
-	\item \textbf{Spatiotemporal Join:} Identifies pairs of objects that came into spatial proximity during overlapping time intervals
-		(e.g., identify all pairs of taxis that came within 10 meters of each other between 16:00 and 20:00 on Friday night, June 6, 2025).
+  \item \textbf{Spatiotemporal Join:} Identifies pairs of objects that came into spatial proximity during overlapping time intervals
+    (e.g., identify all pairs of taxis that came within 10 meters of each other between 16:00 and 20:00 on Friday night, June 6, 2025).
 
-	\item \textbf{k-Nearest Neighbor:} Finds the closest objects to a given location at a specific time or within a time window
-		(e.g., list the five ambulances that were closest to the intersection of Friedrichstraße and Unter den Linden in Berlin at 14:35 on Thursday, June 5, 2025).
+  \item \textbf{k-Nearest Neighbor:} Finds the closest objects to a given location at a specific time or within a time window
+    (e.g., list the five ambulances that were closest to the intersection of Friedrichstraße and Unter den Linden in Berlin at 14:35 on Thursday, June 5, 2025).
 \end{itemize}
 
 \subsection{Distributed Database Management Systems (DDBMS)}
@@ -48,19 +48,19 @@ The primary goal of a DDBMS is to manage a distributed database in such a way th
 \subsection{Challenges in Distributed Systems}
 Distributed systems, including DDBMS, face several inherent challenges:
 \begin{itemize}
-	\item \textbf{Network Latency:} Communication between nodes in a distributed system is significantly slower than accessing local memory or storage.
-	      This delay can affect query performance and data synchronization.
+  \item \textbf{Network Latency:} Communication between nodes in a distributed system is significantly slower than accessing local memory or storage.
+    This delay can affect query performance and data synchronization.
 
-	\item \textbf{Data Consistency:} Ensuring that all nodes reflect the same data at the same time is difficult, especially in the presence of updates.
-	      Different consistency models (such as eventual consistency or strong consistency) are used depending on the application requirements.
+  \item \textbf{Data Consistency:} Ensuring that all nodes reflect the same data at the same time is difficult, especially in the presence of updates.
+    Different consistency models (such as eventual consistency or strong consistency) are used depending on the application requirements.
 
-	\item \textbf{Availability:} A highly available system must respond to requests even if some parts of the system are down.
-	      Maintaining availability while ensuring consistency can be challenging.
+  \item \textbf{Availability:} A highly available system must respond to requests even if some parts of the system are down.
+    Maintaining availability while ensuring consistency can be challenging.
 
-	\item \textbf{Partition Tolerance:} This refers to a system's ability to continue operating even when network partitions occur (i.e., when communication between nodes fails).
+  \item \textbf{Partition Tolerance:} This refers to a system's ability to continue operating even when network partitions occur (i.e., when communication between nodes fails).
 
-	\item \textbf{Fault Tolerance:} Distributed systems must be resilient to hardware failures, crashes, and other unexpected issues.
-	      Mechanisms such as replication and failover are often used to ensure data is not lost and services continue to function.
+  \item \textbf{Fault Tolerance:} Distributed systems must be resilient to hardware failures, crashes, and other unexpected issues.
+    Mechanisms such as replication and failover are often used to ensure data is not lost and services continue to function.
 \end{itemize}
 
 The CAP theorem (discussed below) emphasizes the trade-offs among consistency, availability, and partition tolerance.
@@ -69,9 +69,9 @@ The CAP theorem (discussed below) emphasizes the trade-offs among consistency, a
 A central concept in understanding distributed databases is the CAP theorem, introduced by Brewer \parencite{brewerRobustDistributedSystems2000} and formally proven by Gilbert and Lynch \parencite{gilbertBrewersConjectureFeasibility2002}, which states that a distributed system can guarantee only two of the following three properties at the same time:
 
 \begin{itemize}
-	\item \textbf{Consistency (C):} Every read receives the most recent write or an error.
-	\item \textbf{Availability (A):} Every request receives a (non-error) response, without the guarantee that it contains the most recent write.
-	\item \textbf{Partition Tolerance (P):} The system continues to operate despite arbitrary message loss or failure of part of the system.
+  \item \textbf{Consistency (C):} Every read receives the most recent write or an error.
+  \item \textbf{Availability (A):} Every request receives a (non-error) response, without the guarantee that it contains the most recent write.
+  \item \textbf{Partition Tolerance (P):} The system continues to operate despite arbitrary message loss or failure of part of the system.
 \end{itemize}
 
 It is worth noting that \textbf{CA} systems are impossible as network partitions can and will happen in real world [CITATION].
@@ -101,43 +101,43 @@ Additionally, the differences between \mobilitydbc~and CrateDB can be seen by th
 On the other hand CrateDB focuses on the real-time analytics and horizontal scalability, which makes it a better solution for IoT devices and real-time analytics while still supporting some geospatial functions and types. \footcite{CrateDBDocumentation}.
 The table \ref{tab:mobilitydb_vs_cratedb} shows the differences between \mobilitydbc~and CrateDB and the queries they support.
 \begin{table}[h]
-	\centering
-	\begin{tabular}{|P{3.3cm}|P{6cm}|P{4cm}|}
-		\hline
-		Category                          & \mobilitydbc~                                                       & CrateDB                                                \\
-		\hline
-		Open source                       & Yes                                                                 & Yes                                                    \\
-		\hline
-		Maintained by                     &
-		PostgreSQL Global Development Group,
-		Citus Data team (now part of Microsoft),
-		MobilityDB Community, and OSGeo community
-		                                  & Crate.io                                                                                                                     \\
-		\hline
-		Consistency                       & Full ACID compliance                                                & Eventual Consistancy                                   \\
-		\hline
-		Supports SQL Queries              & Yes, most of the PostgreSQL, MobilityDB, and PostGIS features       & Yes, has its own SQL dialect                                                    \\
-		\hline
-		License                           & OSI-approved open source license similar to the BSD or MIT licenses & Apache 2.0                                             \\
-		\hline
-		% Supported spatiotemporal types & tgeompoint / tgeogpoint & geo\_point / geo\_shape (geospatial data) + time series (combined modeling) \\
-		Supports spatiotemporal datatypes & Yes, builtin datatypes                                              & Yes, geospatial data + time series (combined modeling) \\
-		\hline
-		Spatiotemporal Range Query        & Yes                                                                 & Partial (no native spatiotemporal types)               \\
-		\hline
-		Time Slice Query                  & Yes                                                                 & Yes                                                    \\
-		\hline
-		Window Queries                    & Yes                                                                 & Yes                                                    \\
-		\hline
-		Trajectory Query                  & Yes                                                                 & No                                                     \\
-		\hline
-		Spatiotemporal Join               & Yes                                                                 & No                                                \\
-		\hline
-		k-Nearest Neighbor                & Yes                                                                 & Can be approximated   \\
-		\hline
-	\end{tabular}
-	\caption{Table comparing \mobilitydbc~and CrateDB}
-	\label{tab:mobilitydb_vs_cratedb}
+  \centering
+  \begin{tabular}{|P{3.3cm}|P{6cm}|P{4cm}|}
+    \hline
+    Category                          & \mobilitydbc~                                                       & CrateDB                                                \\
+    \hline
+    Open source                       & Yes                                                                 & Yes                                                    \\
+    \hline
+    Maintained by                     &
+    PostgreSQL Global Development Group,
+    Citus Data team (now part of Microsoft),
+    MobilityDB Community, and OSGeo community
+    & Crate.io                                                                                                                     \\
+    \hline
+    Consistency                       & Full ACID compliance                                                & Eventual Consistancy                                   \\
+    \hline
+    Supports SQL Queries              & Yes, most of the PostgreSQL, MobilityDB, and PostGIS features       & Yes, has its own SQL dialect                                                    \\
+    \hline
+    License                           & OSI-approved open source license similar to the BSD or MIT licenses & Apache 2.0                                             \\
+    \hline
+    % Supported spatiotemporal types & tgeompoint / tgeogpoint & geo\_point / geo\_shape (geospatial data) + time series (combined modeling) \\
+    Supports spatiotemporal datatypes & Yes, builtin datatypes                                              & Yes, geospatial data + time series (combined modeling) \\
+    \hline
+    Spatiotemporal Range Query        & Yes                                                                 & Partial (no native spatiotemporal types)               \\
+    \hline
+    Time Slice Query                  & Yes                                                                 & Yes                                                    \\
+    \hline
+    Window Queries                    & Yes                                                                 & Yes                                                    \\
+    \hline
+    Trajectory Query                  & Yes                                                                 & No                                                     \\
+    \hline
+    Spatiotemporal Join               & Yes                                                                 & No                                                \\
+    \hline
+    k-Nearest Neighbor                & Yes                                                                 & Can be approximated   \\
+    \hline
+  \end{tabular}
+  \caption{Table comparing \mobilitydbc~and CrateDB}
+  \label{tab:mobilitydb_vs_cratedb}
 \end{table}
 
 % \subsection{Benchmarking}
@@ -152,4 +152,3 @@ The table \ref{tab:mobilitydb_vs_cratedb} shows the differences between \mobilit
 
 % \subsection{Cloud}
 % TODO: define VPC - Virtual Private Cloud
-

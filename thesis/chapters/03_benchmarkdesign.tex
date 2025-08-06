@@ -7,26 +7,26 @@ We approach the design by determining the requirements first and then creating a
 
 We have identified the following requirements for our benchmark:
 \begin{enumerate}
-	\item \textbf{spatio-temporal workload} \label{req:spatiotemporal-workload}
-		- benchmark needs to investigate the scalability of the systems under spatio-temporal workload.
-		Spatio-temporal workload is our primary target of this benchmark, since \mobilitydbc value proposition is exactly that.
-	\item \textbf{relevant} \label{req:relevant}
-		- both systems should be deployed in a way that resembled the potential production deployments in real world and metrics collected are informative for potential use-cases and allow measuring the effectiveness of scaling of the systems.
-	\item \textbf{portable} \label{req:portable}
-		- it should be possible to run the benchmark in different environments with little no no changes applied to it.
-		This is an important requirement for us as Google has decided to stop supplying credits for Google Cloud Platform to our University.
-		Because of the lack of credits it was uncertain in which environment the benchmark would be run.
-		Additionally, we should be able to develop the benchmark locally on a single machine before the access to a cluster is granted.
-	\item \textbf{fair} \label{req:fair}
-		- both DDBMS should have access to the same resources and should be treated in the same way.
-		Our goal is not to advocate for one system over the other but to investigate their respective strengths and limitations in processing ST data at scale.
-	\item \textbf{reproducible and repeatable} \label{req:reproducible-repeatable}
-		- the benchmark needs to have a design that allow others to replicate the results and should be defined in a deterministic way.
-		In no part of the benchmark should randomness without seed value be used.
-	\item \textbf{understandable} \label{req:understandable}
-		- benchmark design, workload, metrics, and results must be understandable for a Computer Science Bachelor Student.
-		With that said, we should avoid adding steps and workloads to the benchmark that will complicate the understandability without bringing much value.
-		It is important to handle the trade-off between understandability and relevancy.
+  \item \textbf{spatio-temporal workload} \label{req:spatiotemporal-workload}
+    - benchmark needs to investigate the scalability of the systems under spatio-temporal workload.
+    Spatio-temporal workload is our primary target of this benchmark, since \mobilitydbc value proposition is exactly that.
+  \item \textbf{relevant} \label{req:relevant}
+    - both systems should be deployed in a way that resembled the potential production deployments in real world and metrics collected are informative for potential use-cases and allow measuring the effectiveness of scaling of the systems.
+  \item \textbf{portable} \label{req:portable}
+    - it should be possible to run the benchmark in different environments with little no no changes applied to it.
+    This is an important requirement for us as Google has decided to stop supplying credits for Google Cloud Platform to our University.
+    Because of the lack of credits it was uncertain in which environment the benchmark would be run.
+    Additionally, we should be able to develop the benchmark locally on a single machine before the access to a cluster is granted.
+  \item \textbf{fair} \label{req:fair}
+    - both DDBMS should have access to the same resources and should be treated in the same way.
+    Our goal is not to advocate for one system over the other but to investigate their respective strengths and limitations in processing ST data at scale.
+  \item \textbf{reproducible and repeatable} \label{req:reproducible-repeatable}
+    - the benchmark needs to have a design that allow others to replicate the results and should be defined in a deterministic way.
+    In no part of the benchmark should randomness without seed value be used.
+  \item \textbf{understandable} \label{req:understandable}
+    - benchmark design, workload, metrics, and results must be understandable for a Computer Science Bachelor Student.
+    With that said, we should avoid adding steps and workloads to the benchmark that will complicate the understandability without bringing much value.
+    It is important to handle the trade-off between understandability and relevancy.
 \end{enumerate}
 
 \subsection{Design}
@@ -74,91 +74,90 @@ This choice allows us to meet the repeatability requirement \ref{req:reproducibl
 Our benchmark setup can be seen in \cref{fig:benchmark-design}.
 
 \begin{figure}[ht]
-	\centering
-	\begin{tikzpicture}[
-			font=\small,
-			node distance=0.5cm,
-			box/.style={
-					rectangle,
-					draw,
-					text width=2.5cm,
-					minimum height=1cm,
-					align=center
-				},
-			client/.style={
-					box,
-					fill=blue!10,
-					draw=blue!70
-				},
-			coordinator/.style={
-					box,
-					fill=orange!10,
-					draw=orange!70,
-				},
-			worker/.style={
-					box,
-					fill=purple!10,
-					draw=purple!70
-				},
-			group/.style={
-					rectangle,
-					draw,
-					dashed,
-					inner sep=0.2cm
-				},
-			arrow/.style={
-					->,
-					>=latex
-				}
-		]
-		% Client components
-		\node[client] (db_client) {\textbf{DB Client}};
-		\node[client, below=of db_client] (datagen) {Data Generator};
-		% Client connections
-		\draw[arrow] (datagen) -- (db_client);
-		% Coordinator node
-		\node[coordinator, right=5cm of db_client] (cn) {
-			\textbf{Master Node}};
-		% Worker nodes
-		\node[worker, below=of cn] (w2) {
-			\textbf{Worker Node \\ 2}};
-		\node[worker, left=of w2] (w1) {
-			\textbf{Worker Node \\ 1}};
-		\node[worker, right=of w2] (w3) {
-			\textbf{Worker Node \\ N}};
-		% Connections of coordinator to workers
-		\draw[arrow] (cn) -- (w1);
-		\draw[arrow] (cn) -- (w2);
-		\draw[arrow] (cn) -- (w3);
-		% Client to SUT connections
-		\draw[arrow] (db_client) to[bend left=13] node[above] {Concurrent Queries/Writes} (cn);
-		\draw[arrow] (cn) to[bend left=5] node[below] {Results} (db_client);
-		% Group boxes
-		\begin{pgfonlayer}{background}
-			% Benchmarking client
-			\node[group, fit=(db_client) (datagen)] (client) {};
-			\node[above] at (client.north) {\textbf{Load-generator}};
-			% System Under test
-			\node[group, fit=(cn) (w1) (w2) (w3)] (sut) {};
-			\node[above] at (sut.north) {\textbf{System Under Test}};
-		\end{pgfonlayer}
-	\end{tikzpicture}
-	\caption{
-		Load-generator issues synthetic spatio-temporal inserts and queries to a SUT consisting of one master and N worker nodes.
-	}
-	\label{fig:benchmark-design}
+  \centering
+  \begin{tikzpicture}[
+      font=\small,
+      node distance=0.5cm,
+      box/.style={
+        rectangle,
+        draw,
+        text width=2.5cm,
+        minimum height=1cm,
+        align=center
+      },
+      client/.style={
+        box,
+        fill=blue!10,
+        draw=blue!70
+      },
+      coordinator/.style={
+        box,
+        fill=orange!10,
+        draw=orange!70,
+      },
+      worker/.style={
+        box,
+        fill=purple!10,
+        draw=purple!70
+      },
+      group/.style={
+        rectangle,
+        draw,
+        dashed,
+        inner sep=0.2cm
+      },
+      arrow/.style={
+        ->,
+        >=latex
+      }
+    ]
+    % Client components
+    \node[client] (db_client) {\textbf{DB Client}};
+    \node[client, below=of db_client] (datagen) {Data Generator};
+    % Client connections
+    \draw[arrow] (datagen) -- (db_client);
+    % Coordinator node
+    \node[coordinator, right=5cm of db_client] (cn) {
+    \textbf{Master Node}};
+    % Worker nodes
+    \node[worker, below=of cn] (w2) {
+    \textbf{Worker Node \\ 2}};
+    \node[worker, left=of w2] (w1) {
+    \textbf{Worker Node \\ 1}};
+    \node[worker, right=of w2] (w3) {
+    \textbf{Worker Node \\ N}};
+    % Connections of coordinator to workers
+    \draw[arrow] (cn) -- (w1);
+    \draw[arrow] (cn) -- (w2);
+    \draw[arrow] (cn) -- (w3);
+    % Client to SUT connections
+    \draw[arrow] (db_client) to[bend left=13] node[above] {Concurrent Queries/Writes} (cn);
+    \draw[arrow] (cn) to[bend left=5] node[below] {Results} (db_client);
+    % Group boxes
+    \begin{pgfonlayer}{background}
+      % Benchmarking client
+      \node[group, fit=(db_client) (datagen)] (client) {};
+      \node[above] at (client.north) {\textbf{Load-generator}};
+      % System Under test
+      \node[group, fit=(cn) (w1) (w2) (w3)] (sut) {};
+      \node[above] at (sut.north) {\textbf{System Under Test}};
+    \end{pgfonlayer}
+  \end{tikzpicture}
+  \caption{
+    Load-generator issues synthetic spatio-temporal inserts and queries to a SUT consisting of one master and N worker nodes.
+  }
+  \label{fig:benchmark-design}
 \end{figure}
-
 
 \subsubsection{Metrics and Scenarios}
 
 During the benchmark run, we take measurements of the following metrics using the load-generator for later analysis:
 \begin{enumerate}
-	\item Latency - measured in milliseconds between sending the request to DDBMS and receiving a response from SUT
-	\item Throughput - how many requests have been successfully completed over time, measured in requests per second.
-		We measure it by logging how many queries have been sent and received a successful response in time-windows.
-	\item Success rate - measured in ratio between requests that received a successful response and total requests sent.
-		This allows us to avoid a situation where one SUT would perform better by rejecting multiple queries and thus appearing more performant.
+  \item Latency - measured in milliseconds between sending the request to DDBMS and receiving a response from SUT
+  \item Throughput - how many requests have been successfully completed over time, measured in requests per second.
+    We measure it by logging how many queries have been sent and received a successful response in time-windows.
+  \item Success rate - measured in ratio between requests that received a successful response and total requests sent.
+    This allows us to avoid a situation where one SUT would perform better by rejecting multiple queries and thus appearing more performant.
 \end{enumerate}
 
 Latency and throughput were selected as primary metrics due to their relevance in real-time and high-volume IoT scenarios.
@@ -167,12 +166,12 @@ Furthermore, throughput is important for IoT deployments as they are commonly de
 
 Moreover, we have identified three scenarios for the SUT which we plan to benchmark:
 \begin{enumerate}
-	\item \textbf{Data insertion} - scenario where we simulate clients inserting data to DDBMS.
-By this we want to benchmark how the SUT performs when multiple clients insert data i.e., e-scooters deployed in a city reporting their status and location.
-Here we find the write throughput metric more relevant because it is important for IoT use-cases.
-	\item \textbf{Simple read queries} - in this scenario we try to simulate queries done by the users of a system i.e., people using the e-scooter app to find the closest e-scooters.
-		In this scenario we benchmark the read throughput, as it is a relevant metric for the clients of the system.
-	\item \textbf{Complex read queries} - here we try to simulate a scenario of a complex queries used for analysis and optimizations i.e., queries done by the e-scooter company to find patterns in the traffic to optimize the placement of the e-scooter stations throughout a city or to gain insight into their data.
+  \item \textbf{Data insertion} - scenario where we simulate clients inserting data to DDBMS.
+    By this we want to benchmark how the SUT performs when multiple clients insert data i.e., e-scooters deployed in a city reporting their status and location.
+    Here we find the write throughput metric more relevant because it is important for IoT use-cases.
+  \item \textbf{Simple read queries} - in this scenario we try to simulate queries done by the users of a system i.e., people using the e-scooter app to find the closest e-scooters.
+    In this scenario we benchmark the read throughput, as it is a relevant metric for the clients of the system.
+  \item \textbf{Complex read queries} - here we try to simulate a scenario of a complex queries used for analysis and optimizations i.e., queries done by the e-scooter company to find patterns in the traffic to optimize the placement of the e-scooter stations throughout a city or to gain insight into their data.
 \end{enumerate}
 
 \subsubsection{Scalability}

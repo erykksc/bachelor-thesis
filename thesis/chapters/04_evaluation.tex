@@ -18,69 +18,69 @@ Additionally we use a seed value in order for the pseudo random generators to yi
 Using the generator we simulate 1 billion trips from 01-01-2020 to 31-12-2025.
 The generator create trips in a following manner:
 \begin{enumerate}
-	\item Start point and start time of every trip are chosen randomly from uniform distributions seen on \cref{fig:trip-start-point-distribution} and \cref{fig:trip-time-distribution}
-	\item A random bearing is chosen, also from a uniform distribution seen on \cref{fig:trip-bearing-distribution}
-\item The route traverses through nodes in a direction of a random bearing, choosing nodes with the smallest bearing difference to our chosen bearing.
-	We extend the route by adding nodes to it until we reach the threshold length defined by a Log-normal distribution with $\alpha=0.5$, scale=2100 (median ~2100m) seen on \cref{fig:trip-route-length-distribution}.
-\item We model the speed between the nodes along the trip with a Beta distribution with $\alpha=8, \beta=1$ scaled to 0-20 km/h, seen on \cref{fig:trip-speed-distribution}.
-	We chose this distribution as 20km/h is max legal speed in Germany and a driver needs to slow down on turns or traffic lights but tends to ride close to the max speed.
-\item Using the speed and the distance between the nodes, the time to travel between the nodes is computed.
-\item Using the route, start time, and time to travel between individual nodes of the route, we create a single trip.
-	A trip consist of many events. 
-	An event is a single data entry with following fields and types:
-	\begin{itemize}
-		\item \textbf{event\_id} - UUIDv4
-		\item \textbf{trip\_id} - UUIDv4
-		\item \textbf{timestamp} - ISO 8601 timestamp with timezone offset
-		\item \textbf{latitude} - float
-		\item \textbf{longitude} - float
-	\end{itemize}
+  \item Start point and start time of every trip are chosen randomly from uniform distributions seen on \cref{fig:trip-start-point-distribution} and \cref{fig:trip-time-distribution}
+  \item A random bearing is chosen, also from a uniform distribution seen on \cref{fig:trip-bearing-distribution}
+  \item The route traverses through nodes in a direction of a random bearing, choosing nodes with the smallest bearing difference to our chosen bearing.
+    We extend the route by adding nodes to it until we reach the threshold length defined by a Log-normal distribution with $\alpha=0.5$, scale=2100 (median ~2100m) seen on \cref{fig:trip-route-length-distribution}.
+  \item We model the speed between the nodes along the trip with a Beta distribution with $\alpha=8, \beta=1$ scaled to 0-20 km/h, seen on \cref{fig:trip-speed-distribution}.
+    We chose this distribution as 20km/h is max legal speed in Germany and a driver needs to slow down on turns or traffic lights but tends to ride close to the max speed.
+  \item Using the speed and the distance between the nodes, the time to travel between the nodes is computed.
+  \item Using the route, start time, and time to travel between individual nodes of the route, we create a single trip.
+    A trip consist of many events.
+    An event is a single data entry with following fields and types:
+    \begin{itemize}
+      \item \textbf{event\_id} - UUIDv4
+      \item \textbf{trip\_id} - UUIDv4
+      \item \textbf{timestamp} - ISO 8601 timestamp with timezone offset
+      \item \textbf{latitude} - float
+      \item \textbf{longitude} - float
+    \end{itemize}
 \end{enumerate}
 
 \begin{figure}
-    \begin{subfigure}{0.49\linewidth}
-        \centering
-        \includegraphics[width=\linewidth]{./fig/route-length-distribution-no-labels.pdf}
-        \caption{Route length distribution}
-        \label{fig:trip-route-length-distribution}
-    \end{subfigure}
-    \hfill
-    \begin{subfigure}{0.49\linewidth}
-        \centering
-        \includegraphics[width=\linewidth]{./fig/speed-distribution-no-labels.pdf}
-        \caption{Escooter speed distribution}
-        \label{fig:trip-speed-distribution}
-    \end{subfigure}
-    \vfill
-    \begin{subfigure}{0.49\linewidth}
-        \centering
-        \includegraphics[width=\linewidth]{./fig/bearing-distribution-no-labels.pdf}
-        \caption{Bearing of a trip distribution}
-        \label{fig:trip-bearing-distribution}
-    \end{subfigure}
-    \hfill
-    \begin{subfigure}{0.49\linewidth}
-        \centering
-        \includegraphics[width=\linewidth]{./fig/start-point-distribution-no-labels.pdf}
-        \caption{Start point of a trip distribution}
-        \label{fig:trip-start-point-distribution}
-    \end{subfigure}
-    \vfill
-    \begin{subfigure}{0.49\linewidth}
-        \centering
-        \includegraphics[width=\linewidth]{./fig/time-distribution-no-labels.pdf}
-        \caption{Start time of a trip distribution}
-        \label{fig:trip-time-distribution}
-    \end{subfigure}
-    \caption{Distributions we used in our dataset generator for simulating e-scooter trips}
-    \label{fig:generator-distributions}
+  \begin{subfigure}{0.49\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{./fig/route-length-distribution-no-labels.pdf}
+    \caption{Route length distribution}
+    \label{fig:trip-route-length-distribution}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}{0.49\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{./fig/speed-distribution-no-labels.pdf}
+    \caption{Escooter speed distribution}
+    \label{fig:trip-speed-distribution}
+  \end{subfigure}
+  \vfill
+  \begin{subfigure}{0.49\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{./fig/bearing-distribution-no-labels.pdf}
+    \caption{Bearing of a trip distribution}
+    \label{fig:trip-bearing-distribution}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}{0.49\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{./fig/start-point-distribution-no-labels.pdf}
+    \caption{Start point of a trip distribution}
+    \label{fig:trip-start-point-distribution}
+  \end{subfigure}
+  \vfill
+  \begin{subfigure}{0.49\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{./fig/time-distribution-no-labels.pdf}
+    \caption{Start time of a trip distribution}
+    \label{fig:trip-time-distribution}
+  \end{subfigure}
+  \caption{Distributions we used in our dataset generator for simulating e-scooter trips}
+  \label{fig:generator-distributions}
 \end{figure}
 
 We saved the simulated trips into a CSV file for our load-generator to consume.
 
 \subsubsection{Load-Generator}
 We implement the load-generator in Go (version 1.24).
-We choose this programming language due to its builtin concurrency features: 
+We choose this programming language due to its builtin concurrency features:
 (1) go-routines - lightweight, user-space threads managed by the Go runtime, and
 (2) channels - allow safely communication between go-routines.
 
@@ -88,13 +88,12 @@ We made this decision to simulate many simultaneous DDBMS clients, each consumin
 Goroutines are resource-efficient as the Go runtime performs the N:M mapping of goroutines to OS threads.\footnote{\url{https://go.dev/src/runtime/HACKING}}
 This way we can scale to thousands or even millions of concurrent clients on a single machine, as each client is primarily I/O-bound.
 
-
 Next, we implement 3 modes to the load-generator to run the 3 scenarios from the design:
 \begin{enumerate}
-	\item \textbf{initialize} - initializes tables and indexes
-	\item \textbf{insert} - inserts e-scooter events into DDBMS, implementing the insert scenario
-	\item \textbf{query} - queries DDBMS using randomized queries from a file with templates.
-		We implement two template files for each DDBMS, one containing the simple queries and the second one implementing the complex queries.
+  \item \textbf{initialize} - initializes tables and indexes
+  \item \textbf{insert} - inserts e-scooter events into DDBMS, implementing the insert scenario
+  \item \textbf{query} - queries DDBMS using randomized queries from a file with templates.
+    We implement two template files for each DDBMS, one containing the simple queries and the second one implementing the complex queries.
 \end{enumerate}
 
 \subsubsection{Insert Queries}
@@ -105,58 +104,58 @@ The workers read the jobs containing the events data from the queue and execute 
 Our design of the load-generator can be seen on \cref{fig:load-generator-diagram}.
 
 \begin{figure}[ht]
-\centering
-	\begin{tikzpicture}[
-	  box/.style={draw, minimum width=2, minimum height=1cm, align=center},
-	  smallbox/.style={draw, minimum width=2.5cm, minimum height=1cm, align=center},
-	  arrow/.style={->, thick},
-	  node distance=1.5cm and 1.8cm
-	]
+  \centering
+  \begin{tikzpicture}[
+      box/.style={draw, minimum width=2, minimum height=1cm, align=center},
+      smallbox/.style={draw, minimum width=2.5cm, minimum height=1cm, align=center},
+      arrow/.style={->, thick},
+      node distance=1.5cm and 1.8cm
+    ]
 
-	% Dataset and CSV
-	\node[box, fill=red!30] (dataset) {DataSet\\Generator};
-	\node[smallbox, above=of dataset] (csv) {E-Scooter\\Trips CSV};
+    % Dataset and CSV
+    \node[box, fill=red!30] (dataset) {DataSet\\Generator};
+    \node[smallbox, above=of dataset] (csv) {E-Scooter\\Trips CSV};
 
-	% Main Thread
-	\node[smallbox, right=2cm of csv, fill=blue!30] (mainthread) {Main\\Goroutine};
+    % Main Thread
+    \node[smallbox, right=2cm of csv, fill=blue!30] (mainthread) {Main\\Goroutine};
 
-	% Queue as horizontal cylinder
-	\node[draw, cylinder, shape border rotate=180, minimum height=1.8cm, minimum width=1cm, 
-		  cylinder uses custom fill, fill=green!30, cylinder body fill=green!30,
-		  cylinder end fill=green!30, below=1cm of mainthread] (queue) {Work Queue};
+    % Queue as horizontal cylinder
+    \node[draw, cylinder, shape border rotate=180, minimum height=1.8cm, minimum width=1cm,
+      cylinder uses custom fill, fill=green!30, cylinder body fill=green!30,
+    cylinder end fill=green!30, below=1cm of mainthread] (queue) {Work Queue};
 
-	% Workers
-	\node[box, fill=blue!30, above right=1cm and 2cm of queue] (worker1) {Worker 1};
-	\node[box, fill=blue!30, below=1cm of worker1] (worker2) {Worker 2};
-	\node[box, fill=blue!30, below=1cm of worker2] (workerN) {Worker N};
+    % Workers
+    \node[box, fill=blue!30, above right=1cm and 2cm of queue] (worker1) {Worker 1};
+    \node[box, fill=blue!30, below=1cm of worker1] (worker2) {Worker 2};
+    \node[box, fill=blue!30, below=1cm of worker2] (workerN) {Worker N};
 
-	% Bounding box for LOAD-GENERATOR
-	\node[draw, thick, dashed, fit={(mainthread) (worker1) (worker2) (workerN)}, 
-		  label=above:LOAD-GENERATOR, inner sep=0.9cm] (loadgen) {};
+    % Bounding box for LOAD-GENERATOR
+    \node[draw, thick, dashed, fit={(mainthread) (worker1) (worker2) (workerN)},
+    label=above:LOAD-GENERATOR, inner sep=0.9cm] (loadgen) {};
 
-	% SUT clearly outside the bounding box to the right
-	\node[box, right=0.9cm of loadgen, fill=yellow!30] (sut) {SUT};
+    % SUT clearly outside the bounding box to the right
+    \node[box, right=0.9cm of loadgen, fill=yellow!30] (sut) {SUT};
 
-	% Result Files centered below LOAD-GENERATOR
-	\node[box, below=1cm of loadgen.south] (result) {Measurements and Logs};
+    % Result Files centered below LOAD-GENERATOR
+    \node[box, below=1cm of loadgen.south] (result) {Measurements and Logs};
 
-	% Arrows
-	\draw[arrow] (dataset) -- node[right] {generates} (csv);
-	\draw[arrow] (mainthread) -- node[above, fill=white] {reads} (csv);
-	\draw[arrow] (mainthread) -- node[left, align=center] {inserts\\jobs} (queue);
+    % Arrows
+    \draw[arrow] (dataset) -- node[right] {generates} (csv);
+    \draw[arrow] (mainthread) -- node[above, fill=white] {reads} (csv);
+    \draw[arrow] (mainthread) -- node[left, align=center] {inserts\\jobs} (queue);
 
-		\draw[arrow] (queue.east) -- node[align=center, fill=white] {reads\\job} (worker1.west);
-	\draw[arrow] (queue.east) -- (worker2.west);
-	\draw[arrow] (queue.east) -- (workerN.west);
+    \draw[arrow] (queue.east) -- node[align=center, fill=white] {reads\\job} (worker1.west);
+    \draw[arrow] (queue.east) -- (worker2.west);
+    \draw[arrow] (queue.east) -- (workerN.west);
 
-	\draw[<->, thick] (worker1.east) -- node[fill=white] {queries} (sut);
-	\draw[<->, thick] (worker2.east) -- (sut);
-	\draw[<->, thick] (workerN.east) -- (sut);
+    \draw[<->, thick] (worker1.east) -- node[fill=white] {queries} (sut);
+    \draw[<->, thick] (worker2.east) -- (sut);
+    \draw[<->, thick] (workerN.east) -- (sut);
 
-	\draw[arrow] (loadgen.south) -- node[right] {saves results} (result.north);
-	\end{tikzpicture}
-	\label{fig:load-generator-diagram}
-	\caption{}
+    \draw[arrow] (loadgen.south) -- node[right] {saves results} (result.north);
+  \end{tikzpicture}
+  \label{fig:load-generator-diagram}
+  \caption{}
 \end{figure}
 
 The queue is implemented using go-channel avoiding race conditions and manual mutex locks as the go-channels provide built-in synchronization.
@@ -176,35 +175,35 @@ By doing that we want to simulate two user categories (1) clients (2) analysts.
 Consequently, the simple queries, the ones simulating individual clients, consist of queries that query for information about a single trip.
 We have identified 8 queries relevant for an e-scooter user:
 \begin{enumerate}
-	\item \textbf{Length of a trip} - retrieve the length of a specific trip (e.g., in the summary after a trip)
-	\item \textbf{Trip events} - retrieve all events of a trip (e.g., in order to display them on a map)
-	\item \textbf{Average speed of a trip} - retrieve average speed during the trip (e.g., in the summary after a trip)
-	\item \textbf{Trip start locality} - retrieve the locality the trip started in (i.e., part of the city where the trip started)
-	\item \textbf{Trip finish locality} - retrieve the locality the trip ended in (i.e., part of the city where the trip ended)
-	\item \textbf{First and last location of a trip} - retrieve the first and last location of a trip (e.g., in order to show simplified summary view on a map)
-	\item \textbf{POIs close to the finish location} - retrieve points of interest in a specific radius around the finish location (e.g., in order to show shops nearby)
-	\item \textbf{POIs within radius during the trip} - retrieve which points of interests the user has driven past through during his trip (e.g., in order to mark certain touristic attractions as visited)
+  \item \textbf{Length of a trip} - retrieve the length of a specific trip (e.g., in the summary after a trip)
+  \item \textbf{Trip events} - retrieve all events of a trip (e.g., in order to display them on a map)
+  \item \textbf{Average speed of a trip} - retrieve average speed during the trip (e.g., in the summary after a trip)
+  \item \textbf{Trip start locality} - retrieve the locality the trip started in (i.e., part of the city where the trip started)
+  \item \textbf{Trip finish locality} - retrieve the locality the trip ended in (i.e., part of the city where the trip ended)
+  \item \textbf{First and last location of a trip} - retrieve the first and last location of a trip (e.g., in order to show simplified summary view on a map)
+  \item \textbf{POIs close to the finish location} - retrieve points of interest in a specific radius around the finish location (e.g., in order to show shops nearby)
+  \item \textbf{POIs within radius during the trip} - retrieve which points of interests the user has driven past through during his trip (e.g., in order to mark certain touristic attractions as visited)
 \end{enumerate}
 
 After the simple queries, we define 7 complex queries.
 Those queries aim to mimic the queries an analyst may sent to DMBS in order to gain insight into traffic, find possible optimization points.
 In order to imitate that we defined the following queries, each of them queries about a specific time frame:
 \begin{enumerate}
-	\item \textbf{Trips in locality} - Which trips have passed through a specified locality in time frame
-	\item \textbf{Most visited POIs} - which points of interests had trips that were in specified distance from them in a specified time frame
-	\item \textbf{N closest trips to POI} - find n trips that came the closest to a point of interest in a specified time frame
-	\item \textbf{Average trip duration per locality} - calculate the average trip duration per locality in a specified time frame
-	\item \textbf{Start and end in different localities} - how many trips started and ended in different locality in a specified time frame
-	\item \textbf{Event density heat-map per locality} - generate heat-map of e-scooter usage by area and hour
-	\item \textbf{Trips summaries} - summaries about trips in time frame e.g., minimal, maximal, average of length, duration of a trip as well as of the event count for trips
+  \item \textbf{Trips in locality} - Which trips have passed through a specified locality in time frame
+  \item \textbf{Most visited POIs} - which points of interests had trips that were in specified distance from them in a specified time frame
+  \item \textbf{N closest trips to POI} - find n trips that came the closest to a point of interest in a specified time frame
+  \item \textbf{Average trip duration per locality} - calculate the average trip duration per locality in a specified time frame
+  \item \textbf{Start and end in different localities} - how many trips started and ended in different locality in a specified time frame
+  \item \textbf{Event density heat-map per locality} - generate heat-map of e-scooter usage by area and hour
+  \item \textbf{Trips summaries} - summaries about trips in time frame e.g., minimal, maximal, average of length, duration of a trip as well as of the event count for trips
 \end{enumerate}
 
-% TODO: add the section that mobilitydb is inspired from the tutorial and then the cratedb has been 
+% TODO: add the section that mobilitydb is inspired from the tutorial and then the cratedb has been
 % created to mimic this functionality. There were
 The queries are inspired by the online tutorial [FOOTNOTE LINK], but have been adapted fo
 
 All the queries are parametrized so they do not repeat.
-We generate the actual queries on the fly inside the load-generator during execution. 
+We generate the actual queries on the fly inside the load-generator during execution.
 The random generator is set to a seed and we use a work queue pattern, same as in the insert mode.
 As the seed is set based on the query number and base seed, allowing reproducibility of every query.
 We choose a query template in a rotating fashion, so that the each subsequent template is different from the past one.
@@ -214,9 +213,9 @@ This ensures that we will not be biased towards one DDBMS by generating differen
 We implemented the infrastructure as code using OpenTofu, an open source terraform fork.\footnote{\url{https://opentofu.org/}}
 Using it we defined three deployments:
 \begin{enumerate}
-	\item \textbf{Shared} - defines shared infrastructure between load-generator and AKS-cluster i.e., subnet, virtual network, and a resource group
-	\item \textbf{Load-Generator} - defines the virtual machine (VM) used as load-generator
-	\item \textbf{AKS Cluster} - defines Kubernetes cluster running on Azure Kubernetes Service (AKS)
+  \item \textbf{Shared} - defines shared infrastructure between load-generator and AKS-cluster i.e., subnet, virtual network, and a resource group
+  \item \textbf{Load-Generator} - defines the virtual machine (VM) used as load-generator
+  \item \textbf{AKS Cluster} - defines Kubernetes cluster running on Azure Kubernetes Service (AKS)
 \end{enumerate}
 
 Using three deployments allows us to take down the Kubernetes cluster without affecting the load-generator VM.
@@ -264,13 +263,13 @@ To put it differently, we list the provisioned resources in \cref{tab:node-resou
   \centering
   \begin{tabular}{|c|c|c|}
     \hline
-	  Resource Name & Load-Generator & AKS-Cluster Node \\
+    Resource Name & Load-Generator & AKS-Cluster Node \\
     \hline
-	  VM Size & \verb|Standard_D4alds_v6| & \verb|Standard_D4as_v6| \\
-	  vCPUs & 4 & 4 \\
-	  RAM & 8GiB & 16GiB \\
-	  Persistent Storage Type & Local NVMe drive & \verb|Premium_LRS| Storage Class \\
-	  Persistent Storage Size & 220GiB & 128GiB \\
+    VM Size & \verb|Standard_D4alds_v6| & \verb|Standard_D4as_v6| \\
+    vCPUs & 4 & 4 \\
+    RAM & 8GiB & 16GiB \\
+    Persistent Storage Type & Local NVMe drive & \verb|Premium_LRS| Storage Class \\
+    Persistent Storage Size & 220GiB & 128GiB \\
     \hline
   \end{tabular}
   \caption{Provisioned resources for individual nodes on Azure Cloud on West Europe region}
@@ -286,12 +285,12 @@ Then, we check if the DDBMS is in a healthy state, through Citus commands for Mo
 Subsequently we run the benchmark, defined in a Bash script.
 We perform the following steps using the benchmark script:
 \begin{enumerate}
-	\item Initialize DDBMS by creating tables and schemas. We accomplish this using the initialize mode of our load-generator.
-	\item Run inserts scenario where we bulk insert 100 Million e-scooter events (~12GiB) in batches of 2048 per request using configured number of workers.
-	\item Wait for 3 minutes to let cluster come to rest.
-	\item Run simple queries scenario where we query the DDBMS using generated queries from templates and deterministic pseudo-randomness for 25 minutes.
-	\item Wait for 3 minutes to let cluster come to rest.
-	\item Run complex queries scenario where we query the DDBMS using generated queries from templates and deterministic pseudo-randomness for 25 minutes.
+  \item Initialize DDBMS by creating tables and schemas. We accomplish this using the initialize mode of our load-generator.
+  \item Run inserts scenario where we bulk insert 100 Million e-scooter events (~12GiB) in batches of 2048 per request using configured number of workers.
+  \item Wait for 3 minutes to let cluster come to rest.
+  \item Run simple queries scenario where we query the DDBMS using generated queries from templates and deterministic pseudo-randomness for 25 minutes.
+  \item Wait for 3 minutes to let cluster come to rest.
+  \item Run complex queries scenario where we query the DDBMS using generated queries from templates and deterministic pseudo-randomness for 25 minutes.
 \end{enumerate}
 
 Afterwards we copy the files with results from the load-generator to our local machine.
@@ -302,21 +301,21 @@ Finally, we delete the provisioned DDBMS using helm, which removes the persisten
 We perform 8 benchmark runs with configurations shown in \cref{tab:benchmark-configurations}.
 \begin{table}[ht]
   \centering
-	\begin{tabularx}{\textwidth}{|c|c|Y|Y|Y|Y|}
+  \begin{tabularx}{\textwidth}{|c|c|Y|Y|Y|Y|}
     \hline
-	  Run ID & DDBMS & AKS-Cluster Nodes & Workers in Insert Scenario & Workers in Simple Queries Scenario & Workers in Complex Queries Scenario \\
+    Run ID & DDBMS & AKS-Cluster Nodes & Workers in Insert Scenario & Workers in Simple Queries Scenario & Workers in Complex Queries Scenario \\
     \hline
-		1 & CrateDB     & 3 & 16  & 16  & 4\\
-		2 & MobilityDBC & 3 & 16  & 16  & 4\\
-		3 & CrateDB     & 3 & 128 & 128 & 16\\
-		4 & MobilityDBC & 3 & 128 & 128 & 16\\
-		\hline
-		5 & CrateDB     & 6 & 16  & 16  & 4\\
-		6 & MobilityDBC & 6 & 16  & 16  & 4\\
-		7 & CrateDB     & 6 & 128 & 128 & 16\\
-		8 & MobilityDBC & 6 & 128 & 128 & 16\\
+    1 & CrateDB     & 3 & 16  & 16  & 4\\
+    2 & MobilityDBC & 3 & 16  & 16  & 4\\
+    3 & CrateDB     & 3 & 128 & 128 & 16\\
+    4 & MobilityDBC & 3 & 128 & 128 & 16\\
+    \hline
+    5 & CrateDB     & 6 & 16  & 16  & 4\\
+    6 & MobilityDBC & 6 & 16  & 16  & 4\\
+    7 & CrateDB     & 6 & 128 & 128 & 16\\
+    8 & MobilityDBC & 6 & 128 & 128 & 16\\
     \hline
   \end{tabularx}
   \caption{Benchmark configurations we run}
-\label{tab:benchmark-configurations}
+  \label{tab:benchmark-configurations}
 \end{table}
