@@ -1,0 +1,11 @@
+[project]
+name = "results-analyzer"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "pandas>=2.3.1",
+    "seaborn>=0.13.2",
+    "matplotlib>=3.9.0",
+]
