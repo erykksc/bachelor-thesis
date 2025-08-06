@@ -14,7 +14,7 @@
 \usepackage[titletoc, title]{appendix}
 
 \usepackage{tikz}
-\usetikzlibrary{shapes,arrows,positioning,fit,backgrounds}
+\usetikzlibrary{shapes,arrows,positioning,fit,backgrounds,calc}
 
 \usepackage{color}
 \usepackage{booktabs}
@@ -35,6 +35,11 @@
 \usepackage{subcaption}
 
 \usepackage{array}
+
+% auto adjusting width tables
+\usepackage{tabularx}
+\newcolumntype{Y}{>{\centering\arraybackslash}X}
+
 
 \renewcommand\thefigure{%
 \thesection.\arabic{figure}}

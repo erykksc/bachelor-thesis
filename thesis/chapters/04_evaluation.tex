@@ -88,6 +88,7 @@ We made this decision to simulate many simultaneous DDBMS clients, each consumin
 Goroutines are resource-efficient as the Go runtime performs the N:M mapping of goroutines to OS threads.\footnote{\url{https://go.dev/src/runtime/HACKING}}
 This way we can scale to thousands or even millions of concurrent clients on a single machine, as each client is primarily I/O-bound.
 
+
 Next, we implement 3 modes to the load-generator to run the 3 scenarios from the design:
 \begin{enumerate}
 	\item \textbf{initialize} - initializes tables and indexes
@@ -96,12 +97,67 @@ Next, we implement 3 modes to the load-generator to run the 3 scenarios from the
 		We implement two template files for each DDBMS, one containing the simple queries and the second one implementing the complex queries.
 \end{enumerate}
 
-
 \subsubsection{Insert Queries}
 We insert the e-scooter events from the generated CSV file into DDBMS using multiple concurrent connections.
 
 The insert process works on a basis of a work queue, a pattern described by Burns and Oppenheimer \cite{196346} i.e., main thread reads data from the CSV file and adds jobs to the queue.
 The workers read the jobs containing the events data from the queue and execute insert queries on the DDBMS while collecting metrics.
+Our design of the load-generator can be seen on \cref{fig:load-generator-diagram}.
+
+\begin{figure}[ht]
+\centering
+	\begin{tikzpicture}[
+	  box/.style={draw, minimum width=2, minimum height=1cm, align=center},
+	  smallbox/.style={draw, minimum width=2.5cm, minimum height=1cm, align=center},
+	  arrow/.style={->, thick},
+	  node distance=1.5cm and 1.8cm
+	]
+
+	% Dataset and CSV
+	\node[box, fill=red!30] (dataset) {DataSet\\Generator};
+	\node[smallbox, above=of dataset] (csv) {E-Scooter\\Trips CSV};
+
+	% Main Thread
+	\node[smallbox, right=2cm of csv, fill=blue!30] (mainthread) {Main\\Goroutine};
+
+	% Queue as horizontal cylinder
+	\node[draw, cylinder, shape border rotate=180, minimum height=1.8cm, minimum width=1cm, 
+		  cylinder uses custom fill, fill=green!30, cylinder body fill=green!30,
+		  cylinder end fill=green!30, below=1cm of mainthread] (queue) {Work Queue};
+
+	% Workers
+	\node[box, fill=blue!30, above right=1cm and 2cm of queue] (worker1) {Worker 1};
+	\node[box, fill=blue!30, below=1cm of worker1] (worker2) {Worker 2};
+	\node[box, fill=blue!30, below=1cm of worker2] (workerN) {Worker N};
+
+	% Bounding box for LOAD-GENERATOR
+	\node[draw, thick, dashed, fit={(mainthread) (worker1) (worker2) (workerN)}, 
+		  label=above:LOAD-GENERATOR, inner sep=0.9cm] (loadgen) {};
+
+	% SUT clearly outside the bounding box to the right
+	\node[box, right=0.9cm of loadgen, fill=yellow!30] (sut) {SUT};
+
+	% Result Files centered below LOAD-GENERATOR
+	\node[box, below=1cm of loadgen.south] (result) {Measurements and Logs};
+
+	% Arrows
+	\draw[arrow] (dataset) -- node[right] {generates} (csv);
+	\draw[arrow] (mainthread) -- node[above, fill=white] {reads} (csv);
+	\draw[arrow] (mainthread) -- node[left, align=center] {inserts\\jobs} (queue);
+
+		\draw[arrow] (queue.east) -- node[align=center, fill=white] {reads\\job} (worker1.west);
+	\draw[arrow] (queue.east) -- (worker2.west);
+	\draw[arrow] (queue.east) -- (workerN.west);
+
+	\draw[<->, thick] (worker1.east) -- node[fill=white] {queries} (sut);
+	\draw[<->, thick] (worker2.east) -- (sut);
+	\draw[<->, thick] (workerN.east) -- (sut);
+
+	\draw[arrow] (loadgen.south) -- node[right] {saves results} (result.north);
+	\end{tikzpicture}
+	\label{fig:load-generator-diagram}
+	\caption{}
+\end{figure}
 
 The queue is implemented using go-channel avoiding race conditions and manual mutex locks as the go-channels provide built-in synchronization.
 Individual worker threads measure the metrics from the DDBMS alongside the time they have spent waiting for their next job (ideally, wait time for next job should be 0).
@@ -168,123 +224,99 @@ This is important as the load-generator stays the same between benchmark runs an
 
 \subsubsection{DDBMS Deployment}
 
-We have decided to use containerization in order to improve portability and allow easy local development.
+We have decided to use Docker for containerization of the DDBMS in order to improve portability and allow easy local development.
 We automated the deployment by choosing Kubernetes as the container orchestration tool.
-We chose it over Docker swarm as it has wider adoption, thus improving relevancy as it is more likely that DDBMS will be deployed this way.
+We chose it compered to other container orchestration tools like Docker swarm, as it has the widest adoption by developers\footnote{\url{https://survey.stackoverflow.co/2025/technology/\#1-cloud-development}}, thus improving relevancy of the benchmark, as it is more likely that DDBMS will be deployed this way. We used the provided official Kubernetes operator to deploy the CrateDB clusters.
 
-We used the provided official Kubernetes operator to deploy the CrateDB clusters.
-
-For the MobilityDBC there was no official nor unofficial docker image, so we developed our own.\footnote{\url{https://github.com/erykksc/citus-mobilitydb}}
-We used PostgreSQL 17 image as base for the image as it is the newest supported version by Citus at time of writing.\footnote{\url{https://www.citusdata.com/updates/v13-0/}}
-As the PostgreSQL 17 image is based on Debian, we used the official instructions from Citus webpage on top of PostgreSQL.\footnote{\url{https://www.citusdata.com/download}} to install Citus 13 (newest at time of writing)
+For the MobilityDBC was no official nor unofficial docker image at time of writing, so we developed our own\footnote{\url{https://github.com/erykksc/citus-mobilitydb}}.
+Moreover, we published this image to GitHub Container Registry (GHCR) under MIT License.\footnote{\url{ghcr.io/erykksc/citus-k8s-manager:latest}}
+We use PostgreSQL 17 image as base for the image as it is the latest supported version by Citus at time of writing.\footnote{\url{https://www.citusdata.com/updates/v13-0/}}
+Then, we use the official instructions for Debian from Citus webpage on top of PostgreSQL to install Citus 13 (latest at time of writing)\footnote{\url{https://www.citusdata.com/download}}, as PostgreSQL 17 image is based on Debian.
 The installation of Citus required adding additional repository to Debian's package manager APT, while MobilityDB package was in the official repositories.
 We automatically enable the Citus, MobilityDB, and PostGIS (dependency of MobilityDB) on the container startup.
-We published the image to GitHub Container Registry (GHCR) under MIT License.
 
 Individual worker nodes of MobilityDBC need to be manually connected to the coordinator node, as Citus doesn't support auto discovery.
-For this job, we developed a Manager, a Docker container which when added to the Kubernetes cluster with right permissions, automatically detects new pods running Citus and connects them to the Coordinator.
+For this job, we developed a Manager, a Docker container which when added to the Kubernetes cluster with right permissions, automatically detects new pods running Citus workers and connects them to the Coordinator.
 We also published the images to GHCR under MIT License.\footnote{\url{https://github.com/erykksc/citus-k8s-manager}}
 CrateDB clusters do not require such manager as the nodes support auto discovery and elect the master node themselves.\footnote{\url{https://cratedb.com/docs/guide/admin/clustering/multi-node-setup.html}}
-We created two Helm charts in order to simplify the deployment of the DDBMS, one for CrateDB and one for MobilityDB.
-\footnote{\url{[GITHUB REPO URL]}}
+We created two Helm charts in order to simplify the deployment of the DDBMS, one for CrateDB and one for MobilityDB. \footnote{\url{[GITHUB REPO URL]}}
 Using Helm charts we are able to deploy a collection of Kubernetes deployments such as stateful sets with the nodes, internal and external services, storage classes required to run DDBMS.
 We choose Helm charts as they allow parametrization using templating, so change of Storage Class or number of nodes in cluster can be changed using a CLI argument.
 Kubernetes by itself does not support this feature and relies on external tools, such as Helm.
 
-\subsection{Experiment Results}
+\subsection{Experiment}
 \label{sec:experiment-results}
 
-% \subsection{Load-Generator}
-% This approach allows easy data collection, compared to using multiple load-generators running on multiple hosts and makes the benchmark cheaper to run.
-% We believe this strategy is viable, as the load-generator primarily issues requests, which are i/o heavy, so the performance of the computer running the software shouldn't be a bottleneck.
-% % * this benchmark load-generator is placed on the same VPC in the cloud as the cluster with running DDBMS
-% The load-generator is also put on the cloud in the same virtual private cloud (VPC) as the DDBMS cluster.
-% Putting the load-generator next to the SUT instead of running it on our local computer allows us to minimize latency and potential disturbances while the benchmark runs i.e., packages dropped due to network problems.
+\subsubsection{Provision Resources}
+First, we provision the shared infrastructure and load-generator VM on Azure Cloud using OpenTofu deployments we configured in West Europe region.
+We set the VM size of the load-generator to \verb|Standard_D4alds_v6| (4 AMD vCPUs, 8GiB of RAM, local NVMe SSD disk with 220GiB capacity).
 
+Similarly using OpenTofu, we deploy the first AKS-cluster with 3 nodes, each configured to use \verb|Standard_D4as_v6| VM size (4 AMD vCPUs, 16GiB of RAM).
+We choose to use a VM size with no extra storage as we want to increase the realism of the deployment.
+Kubernetes works with storage by letting pods (can be thought of as containers running on a nodes) access persistent data through Persistent Volume Claims (PVCs), which request storage according to a Storage Class that defines the type and properties of underlying storage.
+Pods use these PVCs to mount and use storage across restarts or rescheduling.
+We define the same Storage Class, using Stock Keeping Unit (SKU) named \verb|Premium_LRS|, in both of our helm deployments, so that MobilityDBC and CrateDB have the same class of persistent storage attached as volume.
+Furthermore, to ensure that the IOPS and other properties for the volumes remain the same, we set the volume size in helm charts to 128GiB (in Azure the size of the volume can dictate the properties of the storage)\footnote{\url{https://learn.microsoft.com/en-us/azure/aks/concepts-storage}}.
 
-% \subsection{DDBMS cluster}
-% We document the DDBMS cluster configuration through Kubernetes deployment files ensuring that the software will be deployed with the same settings and versions using versioned container images.
-% Additionally by using Kubernetes, the benchmark can also be more easily developed on local systems by using contenerization.
-% The local development has been an important consideration as the recent withdrawal of Google from issuing cloud tokens to our university, lead to uncertainty to where the benchmark will be deployed.
-% Kubernetes has been chosen over using bash scripts for installing DDBMS on multiple virtual machines for two reasons.
-% (1) It allows easier deployment of a DDBMS cluster, which is beneficial when deploying multiple cluster sizes and resetting their state by destroying them.
-% (2) Relevancy, as deployment of such clustered DDBMS systems is often done this way in production environments (CITATION HERE)
+To put it differently, we list the provisioned resources in \cref{tab:node-resources}.
 
-% In the benchmark the load-generator will connect with the System Under Test (SUT) and issue queries.
-% It will log metrics allowing later analysis of the findings.
-% The System Under Test, will be run on the same resources i.e., MobilityDB will be deployed on the same resources as CrateDB.
-% The resources for the SUT will be restarted between each benchmark run to ensure a clean state.
+\begin{table}[ht]
+  \centering
+  \begin{tabular}{|c|c|c|}
+    \hline
+	  Resource Name & Load-Generator & AKS-Cluster Node \\
+    \hline
+	  VM Size & \verb|Standard_D4alds_v6| & \verb|Standard_D4as_v6| \\
+	  vCPUs & 4 & 4 \\
+	  RAM & 8GiB & 16GiB \\
+	  Persistent Storage Type & Local NVMe drive & \verb|Premium_LRS| Storage Class \\
+	  Persistent Storage Size & 220GiB & 128GiB \\
+    \hline
+  \end{tabular}
+  \caption{Provisioned resources for individual nodes on Azure Cloud on West Europe region}
+  \label{tab:node-resources}
+\end{table}
 
-% \subsection{Design Objectives}
-% The benchmark should be relevant to real-world use cases, especially spatial-temporal workloads as this is the primary value proposition of MobilityDB over other databases.
-% We accomplish that by modelling queries after common use cases like, time slice queries, window queries, and spatiotemporal joins.
-% We deploy the SUTs on a Kubernetes cluster in Microsoft Azure, resembling common deployment method of companies.
-% Such deployment using infrastructure as code, allows us to share the configuration of SUTs, as well as information of provisioned cloud resources, allowing reproducibility of our results.
+\subsubsection{Benchmark Run}
 
-% The decision to choose Kubernetes over shell scripts or other automation tools such as Ansible has reduced understandability (as not everybody is familiar with container orchestration tools such as Kubernetes), but allowed us to improve portability, relevance and simplified development.
-% This trade off has been made as unexpectedly because of the cloud infrastructure provider, where we wanted to run the benchmark on initially, cut off credits for the university right before the start of the thesis writing.
-% Such change, made us switch to a solution that was more portable.
-% Using containerization, allowed us to develop on single host machine without creating VMs and also made it possible to run our benchmark on other cloud providers or university servers/Kubernetes cluster.
-% Furthermore, use of containers improves repeatability as the node will have exact same versions of the software installed on them.
+Next, we configure the load-generator using our initialization scripts\footnote{\url{GITHUB_REPO}}.
+Afterwards, we deploy the DDBMS using helm charts we defined and monitor the deployment to ensure each worker and coordinator runs on a separate AKS-Cluster node.
+Then, we check if the DDBMS is in a healthy state, through Citus commands for MobilityDBC and Web interface for CrateDB (CrateDB provides a built in web interface).
 
-% The SUTs are benchmarked using equivalent conditions ensuring fairness by
-% (1) deploying them on the same cloud resources (processor types, memory, storage, and networking),
-% (2) running semantically analogous queries,
-% (3) connecting same amount of clients to them, and by
-% (3) inserting same amount of data.
-% Notably, \mobilitydbc~supports more complex queries than CrateDB and because of that we will benchmark queries supported by both systems.
-% We suspect that \mobilitydbc~ being full ACID compliant will result in reduced raw performance, but in this thesis we focus on scalability patterns so are making this trade-off to fairness.
+Subsequently we run the benchmark, defined in a Bash script.
+We perform the following steps using the benchmark script:
+\begin{enumerate}
+	\item Initialize DDBMS by creating tables and schemas. We accomplish this using the initialize mode of our load-generator.
+	\item Run inserts scenario where we bulk insert 100 Million e-scooter events (~12GiB) in batches of 2048 per request using configured number of workers.
+	\item Wait for 3 minutes to let cluster come to rest.
+	\item Run simple queries scenario where we query the DDBMS using generated queries from templates and deterministic pseudo-randomness for 25 minutes.
+	\item Wait for 3 minutes to let cluster come to rest.
+	\item Run complex queries scenario where we query the DDBMS using generated queries from templates and deterministic pseudo-randomness for 25 minutes.
+\end{enumerate}
 
-% Our benchmark evaluates scalability by measuring how each SUT performs under growing cluster sizes and data volumes.
+Afterwards we copy the files with results from the load-generator to our local machine.
+Finally, we delete the provisioned DDBMS using helm, which removes the persistent volumes and pods, ensuring no cache remains between the runs, thus isolating each benchmark run.
 
-% We decided to benchmark the following sizes for the SUT clusters, 2, 3, 4, and 5.
-% Preferably we would benchmark the DDBMS on larger cluster sizes to improve relevance of our findings, but due to resource constrain we choose to do it on a set of small ones to reduce costs.
-% Despite the small difference in size between the sizes, we hope to see a pattern which would allow us to create conclusions about scalability.
+\subsubsection{Results Analysis}
 
-% To check how well the databases handle multiple simultaneous connections and try to find a pattern, we have decided to benchmark the SUT on following number of simultaneous clients 100, 1000, 10000.
-
-% % \subsection{Kubernetes explanation}
-% %
-% % Important aspect of this benchmark was the portability as there was uncertainty where would the experiment be conducted.
-% % Three environments had to be taken into account.
-% % First, the cloud, initially it was planned to run the experiment on Google Cloud Platform but unfortunately, Google suddenly stopped providing credits for the University.
-% % Two, the server cluster of the University, with support for Kubernetes.
-% % Our machines, for testing and in case it wouldn't be possible to use different computers.
-% %
-% % Ultimately we have decided to go with Kubernetes, as it provided a way to run the database systems on all of the three environments, as well as increasing the benchmark relevance, as we assume the production systems are likely gonna be deployed in such environment.
-% % Additionally use of Kubernetes increased ease of use, as it is a common solution for distributed systems, along with robustness, as Kubernetes automatically revives dead nodes, allows to easily change replica count and extend the configuration for real life systems.
-% %
-% % For the data used for the benchmark we decided to use a synthetic data generator that would be run as a pod on the same Kubernetes cluster in order to minimize possible, latency and unknown variables on the network.
-% \subsection{Quality Metrics}
-% % TODO: Move this entire section to Evaluation chapter - metrics definitions, percentile breakdowns, IoT relevance justification
-% To measure scalability we plot the Metric curves over increasing node counts.
-% We choose the following metrics for our benchmark
-% (1) Latency, it will be measured in milliseconds for both inserts and queries. We will create percentile breakdown (P50,P95, P99) to provide insight into tail latencies.
-% (2) Throughput, we will measure the number of records written or queries completed per second.
-
-% In the context of IoT devices, write throughput is important for the devices themselves, and the read latency is important for the users.
-% Because of this, the benchmark results should be relevant.
-
-% \subsection{Workload design}
-% % TODO: Move to separate "Workload Design" chapter or merge into Evaluation. Move Go implementation details to Implementation chapter.
-% We adopt a synthetic workload combined with a micro-benchmark approach where each run isolates one quality of system behavior (e.g., write latency, read throughput).
-% This avoids confounding metrics and ensures interpretable results. We have developed a custom synthetic workload-generator, written in Golang, which will issue concurrent requests using lightweight goroutines to simulate a fixed large number of clients.
-% Golang has been chosen due to goroutines, which are lightweight threads (~2KB stack vs ~1MB stack when using OS threads) managed by the Go runtime, allowing us to simulate a large number of concurrent clients on a relatively small system.
-
-% For the write workload we will simulate IoT devices emitting time-stamped spatial data of %TODO: what will the generated data be of?
-% We will test batch and single-record inserts at varying ingestion rates to measure write throughput and latency.
-
-% Whereas for the read workload, we will simulate %TODO: what will we simulate exactly?
-% This will be performed by running following queries
-% (1) Temporal range queries (e.g., last hour of data per device).
-% (2) Spatial bounding box queries (e.g., devices within a bounding box).
-% (3) Spatio-temporal window queries (e.g., average speed over 10-minute intervals).
-
-% \subsection{Measurement}
-% % TODO: Move this entire section to Evaluation chapter - measurement methodology, goroutine details, resource monitoring specifics
-% We combined the load-generator with the testing client in order for the same goroutine to issues requests as well as to measure their metrics.
-% This way we keep the measuring simple and understandable and don't overcomplicate the setup.
-
-% In order to minimize unknown variables, such as network latency, reliability, and interference of other devices, we put the load-generator on the same Kubernetes cluster.
-% The load-generator pod runs on a separate Kubernetes node, a different host machine, isolated from database nodes to prevent influencing SUT performance.
-% During the evaluation we monitor the resource usage of every node, focusing on the load-generator in order to prevent it from becoming a bottleneck in the benchmark.
+We perform 8 benchmark runs with configurations shown in \cref{tab:benchmark-configurations}.
+\begin{table}[ht]
+  \centering
+	\begin{tabularx}{\textwidth}{|c|c|Y|Y|Y|Y|}
+    \hline
+	  Run ID & DDBMS & AKS-Cluster Nodes & Workers in Insert Scenario & Workers in Simple Queries Scenario & Workers in Complex Queries Scenario \\
+    \hline
+		1 & CrateDB     & 3 & 16  & 16  & 4\\
+		2 & MobilityDBC & 3 & 16  & 16  & 4\\
+		3 & CrateDB     & 3 & 128 & 128 & 16\\
+		4 & MobilityDBC & 3 & 128 & 128 & 16\\
+		\hline
+		5 & CrateDB     & 6 & 16  & 16  & 4\\
+		6 & MobilityDBC & 6 & 16  & 16  & 4\\
+		7 & CrateDB     & 6 & 128 & 128 & 16\\
+		8 & MobilityDBC & 6 & 128 & 128 & 16\\
+    \hline
+  \end{tabularx}
+  \caption{Benchmark configurations we run}
+\label{tab:benchmark-configurations}
+\end{table}

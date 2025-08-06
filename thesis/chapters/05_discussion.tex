@@ -11,6 +11,8 @@ One could also test how would the systems perform with different storage classes
 
 We could have also repeated the benchmark over a longer time-frame in order to minimize the variance of the Cloud performance
 (i.e., running the benchmarks in different weeks or months on different times over a few months in order to enhance reproducibility).
+Furthermore, we could have used the entire generated dataset o 1 Billion e-scooter events instead of a subset of first 100 Million events.
+We chose to only use a subset of events due to time constraint.
 
 Future research could also look into whether change in the hardware of each node would play a role in scalability 
 (i.e., whether improving the hardware of certain nodes, like coordinator in MobilityDBC, would influence the scalability pattern).
@@ -30,7 +32,7 @@ Furthermore, one could benchmark more realistic workload than synthetic micro-be
 It is also worth evaluating, how the systems perform when replication is configured and enabled.
 We did not benchmark it as the MobilityDBC does not support replication natively and additional extensions are required, and we aimed to benchmark the systems under optimal conditions.
 
-Consistency has not been evaluated, as MobilityDBC supports ACID compliant transactions and CrateDB guarantees only eventual consistency.
+We have not evaluated the consistency, as MobilityDBC supports ACID compliant transactions and CrateDB guarantees only eventual consistency.
 Future research could check the latency of CrateDB reaching its consistent state.
 One could also evaluate the performance and scalability of MobilityDBC with transactions and without them.
 
