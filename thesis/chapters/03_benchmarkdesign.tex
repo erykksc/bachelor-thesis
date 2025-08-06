@@ -71,37 +71,7 @@ We deploy the load-generator in the Cloud as well, not on the same resources as 
 Additionally, we run the load-generator in the Cloud instead of locally in order to minimize latency and potential disturbances (i.e., packet loss due to network problems).
 This choice allows us to meet the repeatability requirement \ref{req:reproducible-repeatable}, as the load-generator hardware is set using VM size.
 
-During the benchmark run, we take measurements of the following metrics using the load-generator for later analysis:
-\begin{enumerate}
-	\item Latency - measured in milliseconds between sending the request to DDBMS and receiving a response from SUT
-	\item Throughput - how many requests have been successfully completed over time, measured in requests per second.
-		We measure it by logging how many queries have been sent and received a successful response in time-windows.
-	\item Success rate - measured in ratio between requests that received a successful response and total requests sent.
-		This allows us to avoid a situation where one SUT would perform better by rejecting multiple queries and thus appearing more performant.
-\end{enumerate}
-
-Latency and throughput were selected as primary metrics due to their relevance in real-time and high-volume IoT scenarios.
-A system is considered to scale effectively if throughput increases sub-linearly or better with cluster size, and latency remains within acceptable bounds under increasing load.\cite{hossfeldComparingScalabilityCommunication2023}
-Furthermore, throughput is important for IoT deployments as they are commonly deployed in large quantities and send a numerous inserts i.e., e-scooters deployed in a city which report their location and status.
-
-Moreover, we have identified three scenarios for the SUT which we plan to benchmark:
-\begin{enumerate}
-	\item \textbf{Data insertion} - a scenario where the clients send data to insert to the DDBMS.
-By this we want to benchmark how the SUT performs when multiple clients insert data i.e., e-scooters deployed in a city reporting their status and location.
-Here we find the write throughput metric extremely relevant.
-	\item \textbf{Simple read queries} - in this scenario we try to simulate queries done by the users of a system i.e., people using the e-scooter app to find the closest e-scooters.
-		In this scenario we benchmark the read throughput, as it is a relevant metric for the clients of the system.
-	\item \textbf{Complex read queries} - here we try to simulate a scenario of a complex queries used for analysis and optimizations i.e., queries done by the e-scooter company to find patterns in the traffic to optimize the placement of the e-scooter stations throughout a city or to gain insight into their data.
-\end{enumerate}
-
-\subsubsection{Scalability}
-To establish a scalability pattern we vary cluster sizes to evaluate the horizontal scalability.
-Each cluster size is benchmarked using several user pool sizes, simulating different concurrency levels.
-Benchmarking the DDBMS using different client counts allow us to check whether the performance of the queries is improved, such as the latency, or the throughput.
-This may lead to important findings as some companies may value the performance of the queries for their data analysis more than concurrent connections handled.
-On the other hand a different company may prioritize performance for numerous concurrent devices i.e., an e-scooter company having a large fleet of vehicles.
-
-The resulting benchmark design can be seen in \cref{fig:benchmark-design}.
+Our benchmark setup can be seen in \cref{fig:benchmark-design}.
 
 \begin{figure}[ht]
 	\centering
@@ -174,10 +144,42 @@ The resulting benchmark design can be seen in \cref{fig:benchmark-design}.
 		\end{pgfonlayer}
 	\end{tikzpicture}
 	\caption{
-		Load-generator issues synthetic spatio-temporal inserts and queries to a SUT cluster consisting of one master and N worker nodes.
+		Load-generator issues synthetic spatio-temporal inserts and queries to a SUT consisting of one master and N worker nodes.
 	}
 	\label{fig:benchmark-design}
 \end{figure}
 
-Through this benchmark design, we try to find scalability patterns of two DDBMS under realistic IoT-inspired workloads.
-In the next section we will evaluate the design by implementing and applying it.
+
+\subsubsection{Metrics and Scenarios}
+
+During the benchmark run, we take measurements of the following metrics using the load-generator for later analysis:
+\begin{enumerate}
+	\item Latency - measured in milliseconds between sending the request to DDBMS and receiving a response from SUT
+	\item Throughput - how many requests have been successfully completed over time, measured in requests per second.
+		We measure it by logging how many queries have been sent and received a successful response in time-windows.
+	\item Success rate - measured in ratio between requests that received a successful response and total requests sent.
+		This allows us to avoid a situation where one SUT would perform better by rejecting multiple queries and thus appearing more performant.
+\end{enumerate}
+
+Latency and throughput were selected as primary metrics due to their relevance in real-time and high-volume IoT scenarios.
+A system is considered to scale effectively if throughput increases sub-linearly or better with cluster size, and latency remains within acceptable bounds under increasing load.\cite{hossfeldComparingScalabilityCommunication2023}
+Furthermore, throughput is important for IoT deployments as they are commonly deployed in large quantities and send a numerous inserts i.e., e-scooters deployed in a city which report their location and status.
+
+Moreover, we have identified three scenarios for the SUT which we plan to benchmark:
+\begin{enumerate}
+	\item \textbf{Data insertion} - scenario where we simulate clients inserting data to DDBMS.
+By this we want to benchmark how the SUT performs when multiple clients insert data i.e., e-scooters deployed in a city reporting their status and location.
+Here we find the write throughput metric more relevant because it is important for IoT use-cases.
+	\item \textbf{Simple read queries} - in this scenario we try to simulate queries done by the users of a system i.e., people using the e-scooter app to find the closest e-scooters.
+		In this scenario we benchmark the read throughput, as it is a relevant metric for the clients of the system.
+	\item \textbf{Complex read queries} - here we try to simulate a scenario of a complex queries used for analysis and optimizations i.e., queries done by the e-scooter company to find patterns in the traffic to optimize the placement of the e-scooter stations throughout a city or to gain insight into their data.
+\end{enumerate}
+
+\subsubsection{Scalability}
+To establish a scalability pattern we vary cluster sizes to evaluate the horizontal scalability.
+We benchmark each cluster size using several user pool sizes, simulating different concurrency levels.
+Benchmarking the DDBMS using different client counts allows us to measure whether the performance of the queries is improved, such as the latency, or the throughput.
+This leads to important findings as some companies may value the performance of the queries for their data analysis more than concurrent connections handled.
+On the other hand a different company may prioritize performance for numerous concurrent devices i.e., an e-scooter company having a large fleet of vehicles.
+
+In the next section we will evaluate this benchmark design by implementing and applying it.
