@@ -69,7 +69,7 @@ def load_and_process_csv(filepath: Path) -> Tuple[pd.DataFrame, Dict[str, Any]]:
     metadata = parse_filename(filepath)
     
     # Load CSV
-    df = pd.read_csv(filepath)
+    df = pd.read_csv(filepath, low_memory=False)
     
     # Detect file type from headers
     detected_type = detect_file_type(df)
@@ -212,7 +212,7 @@ def create_query_comparison_boxplots(all_results: List[Tuple[pd.DataFrame, Dict[
         
         if len(plot_data) >= 2:  # Only create plot if we have data from multiple configs
             # Create box plot
-            box_plot = plt.boxplot(plot_data, labels=plot_labels, patch_artist=True)
+            box_plot = plt.boxplot(plot_data, tick_labels=plot_labels, patch_artist=True)
             
             # Color the boxes
             colors = ['lightblue', 'lightcoral', 'lightgreen', 'lightyellow']
