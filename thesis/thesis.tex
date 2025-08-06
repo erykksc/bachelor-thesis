@@ -87,31 +87,30 @@
 \newpage
 
 \section*{Abstract}
-
-% % TODO: Write the abstract
-% FaaS is a cutting-edge new service model that has developed with the current advancement of cloud computing.
-% It allows software developers to deploy their applications quickly and with needed flexibility and scalability, while keeping infrastructure maintenance requirements very low.
-% These benefits are very desirable in edge computing, where ever-changing technologies and requirements need to be implemented rapidly and the fluctuation and heterogeneity of service consumers is a considerable factor.
-% However, edge nodes can often provide only a fraction of the performance of cloud computing infrastructure, which makes running traditional FaaS platforms infeasible.
-% In this thesis, we present a new approach to FaaS that is designed from the ground up with edge computing and IoT requirements in mind.
-% To keep it as lightweight as possible, we use CoAP for communication and Docker to allow for isolation between tenants while re-using containers to achieve the best performance.
-% We also present a proof-of-concept implementation of our design, which we have benchmarked using a custom benchmarking tool, and we compare our results with benchmarks of Lean OpenWhisk, another FaaS platform for the edge.
-% We find that our platform can outperform Lean OpenWhisk in terms of latency and throughput in all tests but that Lean OpenWhisk has higher success rates for a low number of simultaneous clients.
+Spatiotemporal databases increase in demand as smart cities emerge and a large horizontally scalable systems are needed to handle IoT workloads.
+In this thesis we benchmark and compare the horizontal scalability of two open-source distributed database management systems (DDBMS): MobilityDB extended with Citus for horizontal scalability (MobilityDBC) and CrateDB.
+We design a reproducible, portable, and fair benchmark, simulating spatiotemporal workloads inspired by e-scooter trips in Berlin, which we simulate using developed tool for this thesis.
+The benchmark evaluates bulk insert, simple read, and complex read scenarios using synthetic data and metrics such as latency, throughput, and success rate.
+We deploy both systems in Kubernetes clusters on Azure Cloud, varying cluster and client sizes.
+Our findings reveal that CrateDB delivers higher insert throughput, favoring high-ingest scenarios, while MobilityDBC shows robust support for complex spatiotemporal queries and maintains high success rates under analytical load.
+We identified, that CrateDB is can perform simple spatiotemporal queries, yet is incapable of executing complex queries on large datasets.
+Furthermore we see the limitations of our research, such as not benchmarking the UPDATE and DELETE queries.
+Those limitations are viable directions for future research.
 
 % GERMAN
 \clearpage
 \begin{otherlanguage}
   {ngerman}
   \section*{Kurzfassung}
-  % TODO: Translate abstract to german
-  % FaaS ist ein innovatives neues Servicemodell, das sich mit dem aktuellen Vormarsch des Cloud Computing entwickelt hat.
-  % Softwareentwicklende können ihre Anwendungen schneller und mit der erforderlichen Flexibilität und Skalierbarkeit bereitstellen und gleichzeitig den Wartungsaufwand für die Infrastruktur sehr gering halten.
-  % Diese Vorteile sind im Edge-Computing sehr wünschenswert, da sich ständig ändernde Technologien und Anforderungen schnell umgesetzt werden müssen und die Fluktuation und Heterogenität der Service-Consumer ein wichtiger Faktor ist.
-  % Edge-Nodes können jedoch häufig nur einen Bruchteil der Leistung von Cloud-Computing-Infrastruktur bereitstellen, was die Ausführung herkömmlicher FaaS-Plattformen unmöglich macht.
-  % In dieser Arbeit stellen wir einen neuen Ansatz für FaaS eine Platform vor, die von Grund auf unter Berücksichtigung von Edge-Computing- und IoT-Anforderungen entwickelt wurde.
-  % Um den Overhead so gering wie möglich zu halten, nutzen wir CoAP als Messaging-Protokoll und Docker, um Applikationen voneinander zu isolieren, während Container wiederverwendet werden, um die bestmögliche Leistung zu erzielen.
-  % Wir präsentieren auch eine Proof-of-Concept-Implementierung unseres Designs, die wir mit einem eigenen Benchmarking-Tool getestet haben, und vergleichen unsere Ergebnisse mit Benchmarks von Lean OpenWhisk, einer weiteren FaaS-Plattform für die Edge.
-  % Wir stellen fest, dass unsere Plattform Lean OpenWhisk in Bezug auf Latenz und Durchsatz in allen Tests übertreffen kann, Lean OpenWhisk jedoch höhere Erfolgsraten bei einer geringen Anzahl gleichzeitiger Clients aufweist.
+  Spatiotemporale Datenbanken gewinnen an Bedeutung, da Smart Cities entstehen und große horizontal skalierbare Systeme benötigt werden, um IoT-Workloads zu verarbeiten.
+  Diese Arbeit benchmarkt und vergleicht die horizontale Skalierbarkeit von zwei Open-Source Distributed Database Management Systemen (DDBMS): MobilityDB erweitert mit Citus (MobilityDBC) und CrateDB.
+  Wir entwerfen einen reproduzierbaren, portablen und fairen Benchmark, der spatiotemporale Workloads simuliert, inspiriert von E-Scooter-Fahrten in Berlin, die wir mit einem im Rahmen dieser Arbeit entwickelten Tool simulieren.
+  Der Benchmark bewertet Bulk-Inserts, einfache Leseanfragen und komplexe Leseanfragen anhand synthetischer Daten und Metriken wie Latenz, Durchsatz und Erfolgsrate.
+  Wir deployen beide Systeme in Kubernetes-Clustern auf Azure Cloud, wobei wir die Cluster- und Clientgrößen variieren.
+  Unsere Ergebnisse zeigen, dass CrateDB einen höheren Insert-Durchsatz liefert und damit für High-Ingest-Szenarien geeignet ist, während MobilityDBC robuste Unterstützung für komplexe spatiotemporale Abfragen bietet und auch unter analytischer Last hohe Erfolgsraten aufrechterhält.
+  Wir haben festgestellt, dass CrateDB einfache spatiotemporale Abfragen ausführen kann, jedoch nicht in der Lage ist, komplexe Abfragen auf großen Datensätzen auszuführen.
+  Darüber hinaus sehen wir die Einschränkungen unserer Forschung, wie zum Beispiel das Fehlen von Benchmarks für UPDATE- und DELETE-Abfragen.
+  Diese Einschränkungen stellen sinnvolle Ansätze für zukünftige Forschung dar.
 \end{otherlanguage}
 
 \clearpage

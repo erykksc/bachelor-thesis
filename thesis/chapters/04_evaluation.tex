@@ -351,6 +351,16 @@ In the \cref{tab:inserts-table} we show the results for the inserts scenario ben
 We allowed to allow the MobilityDBC to convert the events after all inserts into trajectory data, this action took 37-190 seconds.
 We made this decision to remain fair, the MobilityDBC data types add support for trajectories, so it would be unfair to force it to use other primitives.
 
+We analyze the table and conclude that CrateDB delivered the highest absolute throughput (102k/s).
+We expected those results as CrateDB is designed for horizontal scalability and high thorughput workloads.
+Furthermore, eventual consistency contributes to its performance.
+
+On the other hand MobilityDBC showcases strong scalability pattern, multiplying its throughput by a factor of ~2.7 doubling its performance for 16 workers.
+%
+% MobilityDBC scales far better with workers on c3 (30 % efficiency), roughly doubling throughput when moving from c3→c6 at 16 workers.
+%
+% For crateDB, adding nodes (c3→c6) matters more than adding workers; the opposite is true for MobilityDBC on small clusters.
+
 In the following \cref{tab:simple-queries-table} we show the results for the simple queries scenario benchmark runs.
 
 \begin{table}[ht]
