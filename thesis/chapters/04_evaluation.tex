@@ -32,15 +32,15 @@ We have simulated the 1 billion trips from 01-01-2020 to 31-12-2025 in a followi
 	\end{itemize}
 \end{enumerate}
 
-We saved the simulated trips into a CSV file for our load generator to consume.
+We saved the simulated trips into a CSV file for our load-generator to consume.
 
-\subsubsection{Load Generator}
-We implemented the load generator in golang v1.24.
+\subsubsection{Load-Generator}
+We implemented the load-generator in golang v1.24.
 We choose this programming language due to its builtin concurrency features, go-routines, which are a lightweight, user-space threads managed by the Go runtime, and channels, which allow safely communication between go-routines.
 We made this decision in order to simulate many simultaneous DBMS clients using as possibly little memory in order to simulate many.
 This is possible because go-routine threads are managed by go-runtime and not OS, the memory footprint of them is small.
 
-We implemented 3 modes to the load generator:
+We implemented 3 modes to the load-generator:
 \begin{enumerate}
 	\item \textbf{initialize} - initializes tables and indexes
 	\item \textbf{insert} - inserts e-scooter events into DBMS
@@ -94,7 +94,7 @@ In order to imitate that we defined the following queries, each of them queries 
 The queries are inspired by the online tutorial [FOOTNOTE LINK], but have been adapted fo
 
 All the queries are parametrized so they do not repeat.
-We generate the actual queries on the fly inside the load generator during execution. 
+We generate the actual queries on the fly inside the load-generator during execution. 
 The random generator is set to a seed and we use a worker queue pattern, same as in the insert mode.
 As the seed is set based on the query number and base seed, allowing reproducibility of every query.
 We choose a query template in a rotating fashion, so that the each subsequent template is different from the past one.
@@ -105,12 +105,12 @@ We implemented the infrastructure as code using OpenTofu, an open source terrafo
 Using it we defined three deployments:
 \begin{enumerate}
 	\item \textbf{Shared} - defines shared infrastructure between load-generator and AKS-cluster i.e., subnet, virtual network, and a resource group
-	\item \textbf{Load Generator} - defines the virtual machine (VM) used as load-generator
+	\item \textbf{Load-Generator} - defines the virtual machine (VM) used as load-generator
 	\item \textbf{AKS Cluster} - defines Kubernetes cluster running on Azure Kubernetes Service (AKS)
 \end{enumerate}
 
-Using three deployments allows us to take down the Kubernetes cluster without affecting the load generator VM.
-This is important as the load generator stays the same between benchmark runs and the size of the AKS-cluster changes.
+Using three deployments allows us to take down the Kubernetes cluster without affecting the load-generator VM.
+This is important as the load-generator stays the same between benchmark runs and the size of the AKS-cluster changes.
 
 \subsubsection{Deployment}
 
@@ -143,15 +143,15 @@ We choose Helm charts as they allow parametrization using templating, so change 
 Kubernetes by itself does not support this feature and relies on external tools, such as Helm.
 Helm is the official Kubernetes package manager and is the most commonly used one [CITATION].
 
-\subsection{Experiment}
-\label{sec:experiment}
+\subsection{Experiment Results}
+\label{sec:experiment-results}
 
-% \subsection{Load Generator}
-% This approach allows easy data collection, compared to using multiple load generators running on multiple hosts and makes the benchmark cheaper to run.
-% We believe this strategy is viable, as the load generator primarily issues requests, which are i/o heavy, so the performance of the computer running the software shouldn't be a bottleneck.
-% % * this benchmark load generator is placed on the same VPC in the cloud as the cluster with running DDBMS
-% The load generator is also put on the cloud in the same virtual private cloud (VPC) as the DDBMS cluster.
-% Putting the load generator next to the SUT instead of running it on our local computer allows us to minimize latency and potential disturbances while the benchmark runs i.e., packages dropped due to network problems.
+% \subsection{Load-Generator}
+% This approach allows easy data collection, compared to using multiple load-generators running on multiple hosts and makes the benchmark cheaper to run.
+% We believe this strategy is viable, as the load-generator primarily issues requests, which are i/o heavy, so the performance of the computer running the software shouldn't be a bottleneck.
+% % * this benchmark load-generator is placed on the same VPC in the cloud as the cluster with running DDBMS
+% The load-generator is also put on the cloud in the same virtual private cloud (VPC) as the DDBMS cluster.
+% Putting the load-generator next to the SUT instead of running it on our local computer allows us to minimize latency and potential disturbances while the benchmark runs i.e., packages dropped due to network problems.
 
 
 % \subsection{DDBMS cluster}
@@ -162,7 +162,7 @@ Helm is the official Kubernetes package manager and is the most commonly used on
 % (1) It allows easier deployment of a DDBMS cluster, which is beneficial when deploying multiple cluster sizes and resetting their state by destroying them.
 % (2) Relevancy, as deployment of such clustered DDBMS systems is often done this way in production environments (CITATION HERE)
 
-% In the benchmark the load generator will connect with the System Under Test (SUT) and issue queries.
+% In the benchmark the load-generator will connect with the System Under Test (SUT) and issue queries.
 % It will log metrics allowing later analysis of the findings.
 % The System Under Test, will be run on the same resources i.e., MobilityDB will be deployed on the same resources as CrateDB.
 % The resources for the SUT will be restarted between each benchmark run to ensure a clean state.
@@ -220,7 +220,7 @@ Helm is the official Kubernetes package manager and is the most commonly used on
 % \subsection{Workload design}
 % % TODO: Move to separate "Workload Design" chapter or merge into Evaluation. Move Go implementation details to Implementation chapter.
 % We adopt a synthetic workload combined with a micro-benchmark approach where each run isolates one quality of system behavior (e.g., write latency, read throughput).
-% This avoids confounding metrics and ensures interpretable results. We have developed a custom synthetic workload generator, written in Golang, which will issue concurrent requests using lightweight goroutines to simulate a fixed large number of clients.
+% This avoids confounding metrics and ensures interpretable results. We have developed a custom synthetic workload-generator, written in Golang, which will issue concurrent requests using lightweight goroutines to simulate a fixed large number of clients.
 % Golang has been chosen due to goroutines, which are lightweight threads (~2KB stack vs ~1MB stack when using OS threads) managed by the Go runtime, allowing us to simulate a large number of concurrent clients on a relatively small system.
 
 % For the write workload we will simulate IoT devices emitting time-stamped spatial data of %TODO: what will the generated data be of?
@@ -234,9 +234,9 @@ Helm is the official Kubernetes package manager and is the most commonly used on
 
 % \subsection{Measurement}
 % % TODO: Move this entire section to Evaluation chapter - measurement methodology, goroutine details, resource monitoring specifics
-% We combined the load generator with the testing client in order for the same goroutine to issues requests as well as to measure their metrics.
+% We combined the load-generator with the testing client in order for the same goroutine to issues requests as well as to measure their metrics.
 % This way we keep the measuring simple and understandable and don't overcomplicate the setup.
 
-% In order to minimize unknown variables, such as network latency, reliability, and interference of other devices, we put the load generator on the same Kubernetes cluster.
-% The load generator pod runs on a separate Kubernetes node, a different host machine, isolated from database nodes to prevent influencing SUT performance.
-% During the evaluation we monitor the resource usage of every node, focusing on the load generator in order to prevent it from becoming a bottleneck in the benchmark.
+% In order to minimize unknown variables, such as network latency, reliability, and interference of other devices, we put the load-generator on the same Kubernetes cluster.
+% The load-generator pod runs on a separate Kubernetes node, a different host machine, isolated from database nodes to prevent influencing SUT performance.
+% During the evaluation we monitor the resource usage of every node, focusing on the load-generator in order to prevent it from becoming a bottleneck in the benchmark.
