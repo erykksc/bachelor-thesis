@@ -1,0 +1,3 @@
+[submodule "escooter-trips-generator"]
+	path = escooter-trips-generator
+	url = git@github.com:erykksc/escooter-trips-generator.git
