@@ -26,7 +26,8 @@ def parse_filename(filepath: Path) -> Dict[str, Any]:
         pattern = r"results_insert_([^_]+)_([^_]+)_c(\d+)_(\d+)w_(\d+)b_([^_]+)_(\d+_\d+)\.csv"
         match = re.match(pattern, filename)
         if match:
-            metadata["db_type"] = match.group(1)
+            db_type_raw = match.group(1)
+            metadata["db_type"] = "MobilityDBC" if db_type_raw == "mobilityDB" else db_type_raw
             metadata["dataset"] = match.group(2)
             metadata["cluster_size"] = int(match.group(3))
             metadata["workers"] = int(match.group(4))
@@ -40,7 +41,8 @@ def parse_filename(filepath: Path) -> Dict[str, Any]:
         pattern = r"results_query_([^_]+)_([^_]+)_c(\d+)_(\d+)w_(\d+)q_(\d+_\d+)\.csv"
         match = re.match(pattern, filename)
         if match:
-            metadata["db_type"] = match.group(1)
+            db_type_raw = match.group(1)
+            metadata["db_type"] = "MobilityDBC" if db_type_raw == "mobilityDB" else db_type_raw
             metadata["query_type"] = match.group(2)
             metadata["cluster_size"] = int(match.group(3))
             metadata["workers"] = int(match.group(4))
@@ -137,9 +139,21 @@ def plot_latency_timeseries(all_results: List[Tuple[pd.DataFrame, Dict[str, Any]
         df_sorted = df.sort_values('startTime').reset_index(drop=True)
         df_sorted['request_index'] = range(len(df_sorted))
         
+        # Calculate 1-second rolling average
+        # Estimate requests per second and use that as window size
+        total_duration_seconds = (df_sorted['startTime'].iloc[-1] - df_sorted['startTime'].iloc[0]).total_seconds()
+        requests_per_second = len(df_sorted) / max(total_duration_seconds, 1)
+        rolling_window = max(int(requests_per_second), 50)  # At least 50 requests for small datasets
+        
+        # Apply rolling average
+        df_sorted[f'{duration_col}_rolling'] = df_sorted[duration_col].rolling(
+            window=rolling_window, center=True, min_periods=1
+        ).mean()
+        
         # Create the plot
         plt.figure(figsize=(12, 6))
-        plt.plot(df_sorted['request_index'], df_sorted[duration_col], alpha=0.7, linewidth=0.5)
+        plt.plot(df_sorted['request_index'], df_sorted[f'{duration_col}_rolling'], 
+                alpha=0.8, linewidth=1.5, color='blue')
         
         # Add 10k request marker if we have enough data
         if len(df_sorted) >= 10000:
@@ -152,14 +166,19 @@ def plot_latency_timeseries(all_results: List[Tuple[pd.DataFrame, Dict[str, Any]
         cluster_size = metadata.get('cluster_size', 'Unknown')
         workers = metadata.get('workers', 'Unknown')
         
-        plt.title(f'{title_prefix} Latency Over Time\n{db_type} (c{cluster_size}, {workers}w)')
+        plt.title(f'{title_prefix} Latency Over Time (1s Rolling Average)\n{db_type} (c{cluster_size}, {workers}w)')
         plt.xlabel('Request Index')
         plt.ylabel(f'{title_prefix} Duration (ms)')
         plt.grid(True, alpha=0.3)
         
-        # Save plot
-        filename_safe = metadata["filename"].replace('.csv', '_latency_timeseries.png')
-        plt.savefig(output_dir / filename_safe, dpi=300, bbox_inches='tight')
+        # Save plot with descriptive filename
+        operation = metadata.get("operation", "unknown")
+        db_type = metadata.get("db_type", "unknown")
+        cluster_size = metadata.get("cluster_size", "unknown")
+        workers = metadata.get("workers", "unknown")
+        
+        filename_safe = f"latency_timeseries_{operation}_{db_type}_c{cluster_size}_{workers}w.pdf"
+        plt.savefig(output_dir / filename_safe, bbox_inches='tight')
         plt.close()
         
         print(f"✓ Created latency plot: {filename_safe}")
@@ -182,23 +201,30 @@ def create_query_comparison_boxplots(all_results: List[Tuple[pd.DataFrame, Dict[
             query_templates.update(df['templateName'].unique())
     
     for template in query_templates:
-        plt.figure(figsize=(12, 8))
+        plt.figure(figsize=(15, 10))
         
-        # Prepare data for the box plot
+        # Collect all unique configurations for this template
+        template_configs = set()
+        for df, meta in query_results:
+            if ('templateName' in df.columns and 
+                template in df['templateName'].values):
+                config = (meta.get('db_type'), meta.get('cluster_size'), meta.get('workers'))
+                template_configs.add(config)
+        
+        # Sort configurations for consistent ordering
+        template_configs = sorted(list(template_configs))
+        
         plot_data = []
         plot_labels = []
+        legend_labels = []
         
-        # Order: CrateDB c3, MobilityDB c3, CrateDB c6, MobilityDB c6
-        configs = [
-            ('crateDB', 3), ('mobilityDB', 3), ('crateDB', 6), ('mobilityDB', 6)
-        ]
-        
-        for db_type, cluster_size in configs:
-            # Find matching results
+        # Collect data for each configuration
+        for db_type, cluster_size, workers in template_configs:
             template_data = []
             for df, meta in query_results:
                 if (meta.get('db_type') == db_type and 
                     meta.get('cluster_size') == cluster_size and
+                    meta.get('workers') == workers and
                     'templateName' in df.columns and
                     'queryDurationMs' in df.columns):
                     
@@ -208,16 +234,22 @@ def create_query_comparison_boxplots(all_results: List[Tuple[pd.DataFrame, Dict[
             
             if template_data:
                 plot_data.append(template_data)
-                plot_labels.append(f'{db_type}\nc{cluster_size}')
+                # Create short labels for x-axis
+                plot_labels.append(f'{db_type[:5]}\nc{cluster_size}')
+                # Create detailed labels for legend
+                legend_labels.append(f'{db_type} c{cluster_size} ({workers}w)')
         
         if len(plot_data) >= 2:  # Only create plot if we have data from multiple configs
             # Create box plot
             box_plot = plt.boxplot(plot_data, tick_labels=plot_labels, patch_artist=True)
             
-            # Color the boxes
-            colors = ['lightblue', 'lightcoral', 'lightgreen', 'lightyellow']
-            for patch, color in zip(box_plot['boxes'], colors[:len(plot_data)]):
+            # Color the boxes with different colors/patterns
+            colors = ['lightblue', 'lightcoral', 'lightgreen', 'lightyellow', 
+                     'lightpink', 'lightgray', 'lightcyan', 'wheat']
+            for i, (patch, color) in enumerate(zip(box_plot['boxes'], colors[:len(plot_data)])):
                 patch.set_facecolor(color)
+                # Add slight transparency to distinguish overlapping configs
+                patch.set_alpha(0.8)
             
             plt.title(f'Query Performance Comparison: {template}')
             plt.xlabel('Database Configuration')
@@ -226,9 +258,29 @@ def create_query_comparison_boxplots(all_results: List[Tuple[pd.DataFrame, Dict[
             plt.grid(True, alpha=0.3)
             plt.xticks(rotation=45)
             
-            # Save plot
-            filename_safe = f'query_comparison_{template.replace(" ", "_")}.png'
-            plt.savefig(output_dir / filename_safe, dpi=300, bbox_inches='tight')
+            # Add legend
+            legend_patches = [plt.Rectangle((0,0),1,1, facecolor=colors[i], alpha=0.8) 
+                            for i in range(len(legend_labels))]
+            plt.legend(legend_patches, legend_labels, 
+                      loc='upper left', bbox_to_anchor=(1, 1))
+            
+            # Determine if this is simple or complex queries based on metadata
+            query_complexity = "unknown"
+            for df, meta in query_results:
+                if ('templateName' in df.columns and 
+                    template in df['templateName'].values):
+                    query_type = meta.get('query_type', '')
+                    if 'simple' in query_type.lower():
+                        query_complexity = "simple"
+                        break
+                    elif 'complex' in query_type.lower():
+                        query_complexity = "complex"
+                        break
+            
+            # Save plot with descriptive filename
+            template_clean = template.replace(" ", "_").replace("(", "").replace(")", "").replace("-", "_")
+            filename_safe = f'boxplot_query_{query_complexity}_{template_clean}.pdf'
+            plt.savefig(output_dir / filename_safe, bbox_inches='tight')
             plt.close()
             
             print(f"✓ Created query comparison plot: {filename_safe}")
