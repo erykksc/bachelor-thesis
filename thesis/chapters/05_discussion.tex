@@ -13,8 +13,8 @@ We could have also repeated the benchmark over a longer time-frame in order to m
 (i.e., running the benchmarks in different weeks or months on different times over a few months in order to enhance reproducibility).
 
 Future research could also look into whether change in the hardware of each node would play a role in scalability 
-(i.e., whether improving the hardware of certain nodes, like coordinator in MDBC, would influence the scalability pattern).
-MDBC has a dedicated coordinator node which does not serve data directly, while in CrateDB all nodes participate and act as workers by default (this behavior is configurable).\footnote{\url{https://cratedb.com/docs/crate/reference/en/latest/config/node.html}}
+(i.e., whether improving the hardware of certain nodes, like coordinator in MobilityDBC, would influence the scalability pattern).
+MobilityDBC has a dedicated coordinator node which does not serve data directly, while in CrateDB all nodes participate and act as workers by default (this behavior is configurable).\footnote{\url{https://cratedb.com/docs/crate/reference/en/latest/config/node.html}}
 We have decided not to give an extra node to MobilityDBC in order to keep the benchmark fair.
 In real life deployment one can decide to add an extra coordinator node with less resources, as the Citus docs showcase\footnote{\url{[CITATION]}}.
 One could also setup multiple coordinator nodes and load balance between them to and benchmark such setup.
@@ -25,20 +25,20 @@ Our load-generator implementation does not support reconnection in worker thread
 We could have implemented the reconnection mechanism but due to time constrains we were not able to.
 
 Additionally we could have evaluated the performance of different query types, such as updates and deletes, but due to time constraint we were not able to add this functionality to the load-generator.
-Furthermore, one could benchmark more realistic workload than synthetic micro-benchmark, such as a trace based ones or use a mixed workload such as Yahoo Cloud Serving Benchmark (YCSB) [CITATION].
+Furthermore, one could benchmark more realistic workload than synthetic micro-benchmark, such as a trace based ones or use a mixed workload such as Yahoo Cloud Serving Benchmark (YCSB) \cite{cooperBenchmarkingCloudServing2010}.
 
 It is also worth evaluating, how the systems perform when replication is configured and enabled.
-We did not benchmark it as the MDBC does not support replication natively and additional extensions are required, and we aimed to benchmark the systems under optimal conditions.
+We did not benchmark it as the MobilityDBC does not support replication natively and additional extensions are required, and we aimed to benchmark the systems under optimal conditions.
 
-Consistency has not been evaluated, as MDBC supports ACID compliant transactions and CrateDB guarantees only eventual consistency.
+Consistency has not been evaluated, as MobilityDBC supports ACID compliant transactions and CrateDB guarantees only eventual consistency.
 Future research could check the latency of CrateDB reaching its consistent state.
-One could also evaluate the performance and scalability of MDBC with transactions and without them.
+One could also evaluate the performance and scalability of MobilityDBC with transactions and without them.
 
 As we were new to both DDBMS we could have overlooked possible query optimizations.
-An experienced user of those systems might be able to get more performance of the same cluster sizes and possibly narrow the gap between CrateDB and MDBC querying performance.
+An experienced user of those systems might be able to get more performance of the same cluster sizes and possibly narrow the gap between CrateDB and MobilityDBC querying performance.
 Nonetheless, the goal of this thesis was to benchmark the scalability of both DDBMS and we have accomplished that goal.
 
-It would also be worth to find out what are the possible storage optimization gains in MDBC, as it allows to identify and discard redundant observations from the trajectory data 
+It would also be worth to find out what are the possible storage optimization gains in MobilityDBC, as it allows to identify and discard redundant observations from the trajectory data 
 (i.e., allows to remove data-points which can be interpolated).\footnote{\url{https://mobilitydb.com/project.html}}
 CrateDB also supports interpolation of time-series data, but at the time of writing it does not support interpolation of geospatial points.
 

@@ -1,26 +1,31 @@
 \section{Evaluation}
 \label{cha:evaluation}
 
+We evaluate our design by first implementing it, then running the experiment using it and concluding with analysing the results of the experiment.
+
 \subsection{Implementation}
 \label{sec:implementation}
 
 \subsubsection{Dataset Generator}
-We have decided to not use an off the shelf dataset or dataset generator like [INSERT BERLIN MOD CITATION], but to implement our own.
+We have decided to not use an off the shelf dataset or dataset generator like BerlinMOD \cite{duntgenBerlinMODBenchmarkMoving2009}, but to implement our own generator.
 
-We developed a data generator simulating e-scooter trips in Berlin using Python 3. \footnote{\url{github.com/erykksc/escooter-trips-generator}}
-We used the OpenStreetMap data through OSMnx library to extract the biking network, points of interest and administrative boundaries (we call them localities).
-Inside the repository we also define a flake.nix file, which allow to match the exact versions of Python interpreter and all the libraries we used, ensuring repeatability and reproducibility.
-Additionally we use a seed value in order for the pseudo random generators to yield the same results each run.
+We developed a data generator simulating e-scooter trips in Berlin using Python 3.\footnote{\url{github.com/erykksc/escooter-trips-generator}}
+We used the OpenStreetMap data through OSMnx library to extract the biking network, points of interest and administrative boundaries (in the rest of the thesis we refer to them as localities).
 
+Inside the repository we also define a flake.nix file, which allows us to match the exact versions of Python interpreter and all the libraries used using nix, ensuring repeatability and reproducibility of the dataset generation.
+Additionally we use a seed value in order for the pseudo random generators to yield the same dataset each run.
 
-We have simulated the 1 billion trips from 01-01-2020 to 31-12-2025 in a following manner:
+Using the generator we simulate 1 billion trips from 01-01-2020 to 31-12-2025.
+The generator create trips in a following manner:
 \begin{enumerate}
-\item Start point and start time of every ride is chosen randomly from uniform distribution
-\item A random bearing is chosen, also from a uniform distribution
-\item The route traverses through nodes in a direction of a random bearing, choosing nodes with the smallest bearing difference to our chosen bearing
-\item The speed between the nodes along the trip is modeled with a uniform distribution between 10-20km/h (as 20km/h is max legal speed in Germany and a driver needs to slow down on turns or traffic lights)
-\item Using the speed and the distance between the nodes, the time to travel between the nodes is computed
-\item Using the route, start time, and time to travel between individual nodes of the route, a single trip is created.
+	\item Start point and start time of every trip are chosen randomly from uniform distributions seen on \cref{fig:trip-start-point-distribution} and \cref{fig:trip-time-distribution}
+	\item A random bearing is chosen, also from a uniform distribution seen on \cref{fig:trip-bearing-distribution}
+\item The route traverses through nodes in a direction of a random bearing, choosing nodes with the smallest bearing difference to our chosen bearing.
+	We extend the route by adding nodes to it until we reach the threshold length defined by a Log-normal distribution with $\alpha=0.5$, scale=2100 (median ~2100m) seen on \cref{fig:trip-route-length-distribution}.
+\item We model the speed between the nodes along the trip with a Beta distribution with $\alpha=8, \beta=1$ scaled to 0-20 km/h, seen on \cref{fig:trip-speed-distribution}.
+	We chose this distribution as 20km/h is max legal speed in Germany and a driver needs to slow down on turns or traffic lights but tends to ride close to the max speed.
+\item Using the speed and the distance between the nodes, the time to travel between the nodes is computed.
+\item Using the route, start time, and time to travel between individual nodes of the route, we create a single trip.
 	A trip consist of many events. 
 	An event is a single data entry with following fields and types:
 	\begin{itemize}
@@ -32,51 +37,100 @@ We have simulated the 1 billion trips from 01-01-2020 to 31-12-2025 in a followi
 	\end{itemize}
 \end{enumerate}
 
+\begin{figure}
+    \begin{subfigure}{0.49\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{./fig/route-length-distribution-no-labels.pdf}
+        \caption{Route length distribution}
+        \label{fig:trip-route-length-distribution}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}{0.49\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{./fig/speed-distribution-no-labels.pdf}
+        \caption{Escooter speed distribution}
+        \label{fig:trip-speed-distribution}
+    \end{subfigure}
+    \vfill
+    \begin{subfigure}{0.49\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{./fig/bearing-distribution-no-labels.pdf}
+        \caption{Bearing of a trip distribution}
+        \label{fig:trip-bearing-distribution}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}{0.49\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{./fig/start-point-distribution-no-labels.pdf}
+        \caption{Start point of a trip distribution}
+        \label{fig:trip-start-point-distribution}
+    \end{subfigure}
+    \vfill
+    \begin{subfigure}{0.49\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{./fig/time-distribution-no-labels.pdf}
+        \caption{Start time of a trip distribution}
+        \label{fig:trip-time-distribution}
+    \end{subfigure}
+    \caption{Distributions we used in our dataset generator for simulating e-scooter trips}
+    \label{fig:generator-distributions}
+\end{figure}
+
 We saved the simulated trips into a CSV file for our load-generator to consume.
 
 \subsubsection{Load-Generator}
-We implemented the load-generator in golang v1.24.
-We choose this programming language due to its builtin concurrency features, go-routines, which are a lightweight, user-space threads managed by the Go runtime, and channels, which allow safely communication between go-routines.
-We made this decision in order to simulate many simultaneous DBMS clients using as possibly little memory in order to simulate many.
-This is possible because go-routine threads are managed by go-runtime and not OS, the memory footprint of them is small.
+We implement the load-generator in Go (version 1.24).
+We choose this programming language due to its builtin concurrency features: 
+(1) go-routines - lightweight, user-space threads managed by the Go runtime, and
+(2) channels - allow safely communication between go-routines.
 
-We implemented 3 modes to the load-generator:
+We made this decision to simulate many simultaneous DDBMS clients, each consuming little memory.
+Goroutines are resource-efficient as the Go runtime performs the N:M mapping of goroutines to OS threads.\footnote{\url{https://go.dev/src/runtime/HACKING}}
+This way we can scale to thousands or even millions of concurrent clients on a single machine, as each client is primarily I/O-bound.
+
+Next, we implement 3 modes to the load-generator to run the 3 scenarios from the design:
 \begin{enumerate}
 	\item \textbf{initialize} - initializes tables and indexes
-	\item \textbf{insert} - inserts e-scooter events into DBMS
-	\item \textbf{query} - queries DBMS using randomized queries from a template
+	\item \textbf{insert} - inserts e-scooter events into DDBMS, implementing the insert scenario
+	\item \textbf{query} - queries DDBMS using randomized queries from a file with templates.
+		We implement two template files for each DDBMS, one containing the simple queries and the second one implementing the complex queries.
 \end{enumerate}
 
 
 \subsubsection{Insert Queries}
-We insert the e-scooter events from the generated CSV file into DBMS using multiple concurrent connections.
+We insert the e-scooter events from the generated CSV file into DDBMS using multiple concurrent connections.
 
-The insert process works on a basis of a worker queue [CITATION] i.e., main thread reads data from the CSV file and adds jobs to the queue.
-The workers read the jobs from the queue and execute insert queries on the DBMS while collecting metrics.
+The insert process works on a basis of a work queue, a pattern described by Burns and Oppenheimer \cite{196346} i.e., main thread reads data from the CSV file and adds jobs to the queue.
+The workers read the jobs containing the events data from the queue and execute insert queries on the DDBMS while collecting metrics.
 
 The queue is implemented using go-channel avoiding race conditions and manual mutex locks as the go-channels provide built-in synchronization.
-Individual worker threads measure the metrics from the DBMS alongside the time they have spent waiting for their next job.
-We have added this mechanism in order to ensure that the speed at which main thread reads from file is not a bottleneck as we want to ensure that the load-generator is not a bottleneck in the benchmark.
+Individual worker threads measure the metrics from the DDBMS alongside the time they have spent waiting for their next job (ideally, wait time for next job should be 0).
+We have added this mechanism in order to ensure that the speed at which main thread reads from file is not a bottleneck as this would make load-generator a bottleneck in the benchmark.
+
+We implemented two modes of inserts into load-generator: batch and bulk.
+In the batch mode we insert multiple single SQL queries into a single request, reducing the network trips.
+We made the batch size configurable so it is possible to send single insert queries.
+On the other hand, in the bulk we send single request with a configurable amount of events.
 
 \subsubsection{Read Queries}
 
 We split the read queries into two categories, simple and complex.
 By doing that we want to simulate two user categories (1) clients (2) analysts.
 
-The simple queries, the ones simulating individual clients, consist of queries that query for information about a single trip.
+Consequently, the simple queries, the ones simulating individual clients, consist of queries that query for information about a single trip.
 We have identified 8 queries relevant for an e-scooter user:
 \begin{enumerate}
-	\item \textbf{Length of a trip} - retrieve the length of a specific trip e.g., in the summary after a trip
-	\item \textbf{Trip events} - retrieve all events of a trip e.g., in order to display them on a map
-	\item \textbf{Average speed of a trip} - retrieve average speed during the trip e.g., in the summary after a trip
-	\item \textbf{Trip start locality} - retrieve the locality the trip started in i.e., part of the city where the trip started
-	\item \textbf{Trip finish locality} - retrieve the locality the trip ended in i.e., part of the city where the trip ended
-	\item \textbf{First and last location of a trip} - retrieve the first and last location of a trip e.g., in order to show simplified summary view on a map
-	\item \textbf{POIs close to the finish location} - retrieve points of interest in a specific radius around the finish location e.g., in order to show shops nearby
-	\item \textbf{POIs within radius during the trip} - retrieve which points of interests the user has driven past through during his trip e.g., in order to mark certain touristic attractions as visited
+	\item \textbf{Length of a trip} - retrieve the length of a specific trip (e.g., in the summary after a trip)
+	\item \textbf{Trip events} - retrieve all events of a trip (e.g., in order to display them on a map)
+	\item \textbf{Average speed of a trip} - retrieve average speed during the trip (e.g., in the summary after a trip)
+	\item \textbf{Trip start locality} - retrieve the locality the trip started in (i.e., part of the city where the trip started)
+	\item \textbf{Trip finish locality} - retrieve the locality the trip ended in (i.e., part of the city where the trip ended)
+	\item \textbf{First and last location of a trip} - retrieve the first and last location of a trip (e.g., in order to show simplified summary view on a map)
+	\item \textbf{POIs close to the finish location} - retrieve points of interest in a specific radius around the finish location (e.g., in order to show shops nearby)
+	\item \textbf{POIs within radius during the trip} - retrieve which points of interests the user has driven past through during his trip (e.g., in order to mark certain touristic attractions as visited)
 \end{enumerate}
 
-Besides the simple queries, we have defined 7 complex queries.
+After the simple queries, we define 7 complex queries.
 Those queries aim to mimic the queries an analyst may sent to DMBS in order to gain insight into traffic, find possible optimization points.
 In order to imitate that we defined the following queries, each of them queries about a specific time frame:
 \begin{enumerate}
@@ -95,13 +149,13 @@ The queries are inspired by the online tutorial [FOOTNOTE LINK], but have been a
 
 All the queries are parametrized so they do not repeat.
 We generate the actual queries on the fly inside the load-generator during execution. 
-The random generator is set to a seed and we use a worker queue pattern, same as in the insert mode.
+The random generator is set to a seed and we use a work queue pattern, same as in the insert mode.
 As the seed is set based on the query number and base seed, allowing reproducibility of every query.
 We choose a query template in a rotating fashion, so that the each subsequent template is different from the past one.
-This ensures that we will not be biased towards one DBMS by generating different queries for it.
+This ensures that we will not be biased towards one DDBMS by generating different queries for it.
 
 \subsubsection{Infrastructure}
-We implemented the infrastructure as code using OpenTofu, an open source terraform fork.
+We implemented the infrastructure as code using OpenTofu, an open source terraform fork.\footnote{\url{https://opentofu.org/}}
 Using it we defined three deployments:
 \begin{enumerate}
 	\item \textbf{Shared} - defines shared infrastructure between load-generator and AKS-cluster i.e., subnet, virtual network, and a resource group
@@ -112,36 +166,30 @@ Using it we defined three deployments:
 Using three deployments allows us to take down the Kubernetes cluster without affecting the load-generator VM.
 This is important as the load-generator stays the same between benchmark runs and the size of the AKS-cluster changes.
 
-\subsubsection{Deployment}
+\subsubsection{DDBMS Deployment}
 
 We have decided to use containerization in order to improve portability and allow easy local development.
 We automated the deployment by choosing Kubernetes as the container orchestration tool.
-We chose it over Docker swarm as it has wider adoption, thus improving relevancy as it is more likely that DBMS will be deployed this way.
+We chose it over Docker swarm as it has wider adoption, thus improving relevancy as it is more likely that DDBMS will be deployed this way.
 
 We used the provided official Kubernetes operator to deploy the CrateDB clusters.
 
-For the MobilityDBC there was no official nor unofficial docker image, so we developed our own.
-\footnote{\url{https://github.com/erykksc/citus-mobilitydb}}
-We used PostgreSQL 17 image as base for the image as it is the newest supported version by Citus at time of writing.
-\footnote{\url{https://www.citusdata.com/updates/v13-0/}}
-As the PostgreSQL 17 image is based on Debian, we used the official instructions from Citus webpage on top of PostgreSQL.
-\footnote{\url{https://www.citusdata.com/download}} to install Citus 13 (newest at time of writing)
+For the MobilityDBC there was no official nor unofficial docker image, so we developed our own.\footnote{\url{https://github.com/erykksc/citus-mobilitydb}}
+We used PostgreSQL 17 image as base for the image as it is the newest supported version by Citus at time of writing.\footnote{\url{https://www.citusdata.com/updates/v13-0/}}
+As the PostgreSQL 17 image is based on Debian, we used the official instructions from Citus webpage on top of PostgreSQL.\footnote{\url{https://www.citusdata.com/download}} to install Citus 13 (newest at time of writing)
 The installation of Citus required adding additional repository to Debian's package manager APT, while MobilityDB package was in the official repositories.
 We automatically enable the Citus, MobilityDB, and PostGIS (dependency of MobilityDB) on the container startup.
 We published the image to GitHub Container Registry (GHCR) under MIT License.
 
 Individual worker nodes of MobilityDBC need to be manually connected to the coordinator node, as Citus doesn't support auto discovery.
 For this job, we developed a Manager, a Docker container which when added to the Kubernetes cluster with right permissions, automatically detects new pods running Citus and connects them to the Coordinator.
-We also published the images to GHCR under MIT License.
-\footnote{\url{https://github.com/erykksc/citus-k8s-manager}}
-CitusDB clusters do not require such manager as the nodes support auto discovery and elect the master node themselves, provided a valid configuration upfront.[FOOTNOTE]
-
-We created two Helm charts in order to simplify the deployment of the DBMS, one for CrateDB and one for MobilityDB.
+We also published the images to GHCR under MIT License.\footnote{\url{https://github.com/erykksc/citus-k8s-manager}}
+CrateDB clusters do not require such manager as the nodes support auto discovery and elect the master node themselves.\footnote{\url{https://cratedb.com/docs/guide/admin/clustering/multi-node-setup.html}}
+We created two Helm charts in order to simplify the deployment of the DDBMS, one for CrateDB and one for MobilityDB.
 \footnote{\url{[GITHUB REPO URL]}}
-Using Helm charts we are able to deploy a collection of Kubernetes deployments such as stateful sets with the nodes, internal and external services, storage classes required to run DBMS.
+Using Helm charts we are able to deploy a collection of Kubernetes deployments such as stateful sets with the nodes, internal and external services, storage classes required to run DDBMS.
 We choose Helm charts as they allow parametrization using templating, so change of Storage Class or number of nodes in cluster can be changed using a CLI argument.
 Kubernetes by itself does not support this feature and relies on external tools, such as Helm.
-Helm is the official Kubernetes package manager and is the most commonly used one [CITATION].
 
 \subsection{Experiment Results}
 \label{sec:experiment-results}
