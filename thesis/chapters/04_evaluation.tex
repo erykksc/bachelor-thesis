@@ -296,9 +296,8 @@ We perform the following steps using the benchmark script:
 Afterwards we copy the files with results from the load-generator to our local machine.
 Finally, we delete the provisioned DDBMS using helm, which removes the persistent volumes and pods, ensuring no cache remains between the runs, thus isolating each benchmark run.
 
-\subsubsection{Results Analysis}
-
 We perform 8 benchmark runs with configurations shown in \cref{tab:benchmark-configurations}.
+
 \begin{table}[ht]
   \centering
   \begin{tabularx}{\textwidth}{|c|c|Y|Y|Y|Y|}
@@ -319,3 +318,93 @@ We perform 8 benchmark runs with configurations shown in \cref{tab:benchmark-con
   \caption{Benchmark configurations we run}
   \label{tab:benchmark-configurations}
 \end{table}
+
+\subsubsection{Results}
+
+We exclude the results of queries that started in the first 4 minutes of the benchmark to exclude the queries that were performed when DDBMS was warming up (filling up caches and other database warm up phases).
+
+In the \cref{tab:inserts-table} we show the results for the inserts scenario benchmark runs.
+
+\begin{table}[ht]
+  \centering
+  \begin{tabularx}{\textwidth}{|c|Y|Y|Y|Y|Y|Y|}
+    \hline
+    Database & Cluster Size&  Workers  &Total Duration (s) &Mean Latency (ms) & Latency Std Deviation (ms) & Throu-ghput (records/s) \\
+    \hline
+    crateDB           &c3       &16             &1563.0              &613.5              &355.4                  &53367\\
+    crateDB           &c6       &16              &861.0              &391.3              &239.8                  &83642\\
+    crateDB           &c3      &128             &1896.0             &5745.4             &6355.9                  &44983\\
+    crateDB           &c6      &128              &624.0             &2523.4             &1287.7                 &102433\\
+    \hline
+    MobilityDBC           &c3       &16             &5479.0             &2058.0             &1539.8                  &15916\\
+    MobilityDBC           &c6       &16             &1882.0              &766.7              &520.2                  &42699\\
+    MobilityDBC           &c3      &128             &2242.0             &6898.8             &3805.9                  &37866\\
+    MobilityDBC           &c6      &128             &1007.0             &3473.1             &1698.2                  &75054\\
+    \hline
+  \end{tabularx}
+  \caption{Results for the inserts scenario for cluster of sizes 3 and 6, success rate for all configurations was at 100\% (i.e., all insert queries were successful).
+    Note that the total duration is the time between first request start time and last request end time from filtered requests.
+  }
+  \label{tab:inserts-table}
+\end{table}
+
+We allowed to allow the MobilityDBC to convert the events after all inserts into trajectory data, this action took 37-190 seconds.
+We made this decision to remain fair, the MobilityDBC data types add support for trajectories, so it would be unfair to force it to use other primitives.
+
+In the following \cref{tab:simple-queries-table} we show the results for the simple queries scenario benchmark runs.
+
+\begin{table}[ht]
+  \small
+  \centering
+  \makebox[\textwidth][c]{
+    \begin{tabularx}{1.1\textwidth}{|c|Y|Y|Y|Y|Y|Y|Y|Y|Y|Y|}
+      \hline
+      Database & Cluster Size  & Workers & Total Duration (s) & Mean Latency (ms) & Median Latency (ms) & Latency Std Deviation (ms) & Throu-ghput (queries/s) &Total Queries\\
+      \hline
+      crateDB           &c3      &128            &1198.0             &2922.3               &1365.0             &5761.6                   &42.5                    &50,962 \\
+      crateDB           &c3       &16            &1162.0              &532.1                &372.0              &743.1                   &29.9                    &34,793 \\
+      crateDB           &c6      &128            &1182.0             &1781.8               &1145.0             &2619.9                   &70.5                    &83,296 \\
+      crateDB           &c6       &16            &1158.0              &440.9                &395.0              &409.4                   &36.2                    &41,927 \\
+      \hline
+      MobilityDBC           &c3      &128            &1180.0             &2801.2                &158.0             &4441.9                   &45.1                    &53,234 \\
+      MobilityDBC           &c3       &16            &1165.0              &348.4                 &34.0              &526.2                   &45.8                    &53,370 \\
+      MobilityDBC           &c6      &128            &1176.0             &2799.1                &161.0             &4235.4                   &45.3                    &53,258 \\
+      MobilityDBC           &c6       &16            &1166.0              &346.8                 &33.5              &519.4                   &46.0                    &53,660 \\
+      \hline
+    \end{tabularx}
+  }
+  \caption{Results for the simple queries scenario for cluster of sizes 3 and 6, success rate for all configurations was at 100\% (i.e., all queries were successful).
+    Note that the total duration is the time between first request start time and last request end time from filtered requests.
+  }
+  \label{tab:simple-queries-table}
+\end{table}
+
+Consequently, in the \cref{tab:complex-queries-table} we show the results for the complex queries scenario benchmark runs.
+
+\begin{table}[ht]
+  \small
+  \centering
+  \makebox[\textwidth][c]{
+    \begin{tabularx}{1.2\textwidth}{|c|Y|Y|Y|Y|Y|Y|Y|Y|Y|Y|}
+      \hline
+      Database & Cluster Size  & Workers  & Total Duration (s) &Mean Duration (ms) &Median Duration (ms) &Std Deviation (ms) &Total Queries &Throughput (queries /100s) &Successful Queries      &Success Rate (\%) \\
+      \hline
+      crateDB           &c3        &4               &285.0            &31226.5               &5463.0            &54819.8             &7                    &0.00                    &4                      &57.1 \\
+      crateDB           &c3       &16               &502.0           &353314.5             &443902.5           &195237.8            &23                    &0.00                    &4                      &17.4 \\
+      crateDB           &c6        &4               &559.0            &89218.3               &6788.0           &155220.1            &18                    &0.00                   &15                      &83.3 \\
+      crateDB           &c6       &16               &652.0            &17190.5              &10809.0            &35511.4           &229                   &10.00                   &59                      &25.8 \\
+      \hline
+      MobilityDBC       &c3        &4              &1161.0            &10683.1              &11101.0            &10586.1           &428                   &40.00                  &428                     &100.0 \\
+      MobilityDBC       &c3       &16              &1205.0            &42517.9              &45514.5            &41960.8           &424                   &30.00                  &420                      &99.1 \\
+      MobilityDBC       &c6        &4              &1162.0             &4474.2               &4306.5             &4688.8         &1,032                   &90.00                &1,032                     &100.0 \\
+      MobilityDBC       &c6       &16              &1206.0            &18850.4              &18510.0            &19794.0           &981                   &80.00                  &981                     &100.0 \\
+      \hline
+    \end{tabularx}
+  }
+  \caption{Results for the complex queries scenario for cluster of sizes 3 and 6.
+    Note that the total duration is the time between first request start time and last request end time from filtered requests.
+  }
+  \label{tab:complex-queries-table}
+\end{table}
+
+% Consequently, the inserts scenario showcased that CrateDB

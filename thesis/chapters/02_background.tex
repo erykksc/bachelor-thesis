@@ -94,8 +94,6 @@ It is based on shared-nothing architecture using Elasticsearch and Lucene under 
 CrateDB uses a distributed eventual consistency model, meaning data written to one node may take time to propagate to others.
 It relaxes ACID constraints to gain performance and scalability, making it less suitable for applications requiring strict consistency.
 
-% NOTE: Comparison of MobilityDB and CrateDB
-% Citations for the support of the queries: https://www.perplexity.ai/search/which-of-these-queries-is-supp-n5CXpQokRBW2lIHKPA0yLg
 Additionally, the differences between \mobilitydbc~and CrateDB can be seen by the available complex queries in \mobilitydbc~compared to the features of CrateDB.
 \mobilitydbc~has comprehensive support for spatiotemporal queries, including complex queries such as spatiotemporal joins and k-nearest neighbor queries \parencite{bakliDistributedSpatiotemporalTrajectory2020} \footcite{QueryingDataMobilitydbDocs}.
 On the other hand CrateDB focuses on the real-time analytics and horizontal scalability, which makes it a better solution for IoT devices and real-time analytics while still supporting some geospatial functions and types. \footcite{CrateDBDocumentation}.

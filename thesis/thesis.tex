@@ -38,7 +38,7 @@
 
 % auto adjusting width tables
 \usepackage{tabularx}
-\newcolumntype{Y}{>{\centering\arraybackslash}X}
+\newcolumntype{Y}{>{\centering\arraybackslash\hspace{0pt}}X}
 
 \renewcommand\thefigure{%
 \thesection.\arabic{figure}}
@@ -65,7 +65,7 @@
 \DeclareFieldFormat{eprint}{arXiv: \href{https://arxiv.org/abs/#1}{#1}}
 \DeclareFieldFormat[report]{title}{``#1''}
 
-\newcommand{\projectTitle}{Benchmarking the Scalability Behaviour of MobilityDB and CrateDB}
+\newcommand{\projectTitle}{Benchmarking the Scalability Behavior of MobilityDB and CrateDB}
 \newcommand{\thesisType}{Bachelor's Thesis}
 \newcommand{\authors}{Eryk Karol Kściuczyk}
 \newcommand{\matrikel}{468796}
