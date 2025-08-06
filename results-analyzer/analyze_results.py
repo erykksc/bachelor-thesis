@@ -118,8 +118,82 @@ def load_all_results(results_dir: Path) -> List[Tuple[pd.DataFrame, Dict[str, An
     
     return all_results
 
-def plot_latency_timeseries(all_results: List[Tuple[pd.DataFrame, Dict[str, Any]]], output_dir: Path) -> None:
-    """Create latency time-series plots for each result file."""
+def apply_benchmark_filtering(df: pd.DataFrame, start_filter_min: int = 4, end_filter_min: int = 1) -> pd.DataFrame:
+    """Filter out first N minutes and last M minutes of benchmark run to remove artifacts."""
+    if df.empty or 'startTime' not in df.columns:
+        return df
+    
+    # Calculate benchmark time boundaries
+    benchmark_start = df['startTime'].min()
+    benchmark_end = df['startTime'].max()
+    
+    # Define filtering boundaries
+    start_cutoff = benchmark_start + pd.Timedelta(minutes=start_filter_min)
+    end_cutoff = benchmark_end - pd.Timedelta(minutes=end_filter_min)
+    
+    # Apply filtering
+    filtered_df = df[(df['startTime'] >= start_cutoff) & (df['startTime'] <= end_cutoff)]
+    
+    return filtered_df
+
+def create_insert_performance_table(all_results: List[Tuple[pd.DataFrame, Dict[str, Any]]]) -> pd.DataFrame:
+    """Create a summary table for insert performance metrics."""
+    insert_results = [(df, meta) for df, meta in all_results if meta["operation"] == "insert"]
+    
+    if not insert_results:
+        return pd.DataFrame()
+    
+    table_data = []
+    
+    for df, metadata in insert_results:
+        # Apply benchmark filtering
+        df_filtered = apply_benchmark_filtering(df)
+        
+        if df_filtered.empty:
+            continue
+            
+        # Extract metadata
+        database = metadata.get('db_type', 'Unknown')
+        cluster_size = metadata.get('cluster_size', 'Unknown')
+        workers = metadata.get('workers', 'Unknown')
+        
+        # Calculate metrics
+        if 'insertDurationMs' in df_filtered.columns:
+            # Success rate calculation
+            total_operations = len(df_filtered)
+            successful_operations = len(df_filtered[df_filtered['insertDurationMs'] > 0])
+            success_rate = (successful_operations / total_operations * 100) if total_operations > 0 else 0
+            
+            # Duration statistics (only for successful operations)
+            valid_durations = df_filtered[df_filtered['insertDurationMs'] > 0]['insertDurationMs']
+            if not valid_durations.empty:
+                total_duration = valid_durations.sum()
+                std_deviation = valid_durations.std()
+                mean_duration = valid_durations.mean()
+            else:
+                total_duration = 0
+                std_deviation = 0
+                mean_duration = 0
+            
+            # Total records inserted
+            total_records = df_filtered['successfullyInserted'].sum() if 'successfullyInserted' in df_filtered.columns else 0
+            
+            table_data.append({
+                'Database': database,
+                'Cluster Size': f'c{cluster_size}',
+                'Workers': workers,
+                'Success Rate (%)': f'{success_rate:.1f}',
+                'Total Duration (s)': f'{total_duration/1000:.1f}',
+                'Mean Duration (ms)': f'{mean_duration:.1f}',
+                'Std Deviation (ms)': f'{std_deviation:.1f}',
+                'Total Records': f'{total_records:,}',
+                'Operations': total_operations
+            })
+    
+    return pd.DataFrame(table_data)
+
+def plot_latency_distributions(all_results: List[Tuple[pd.DataFrame, Dict[str, Any]]], output_dir: Path) -> None:
+    """Create latency distribution plots for each result file."""
     output_dir.mkdir(exist_ok=True)
     
     for df, metadata in all_results:
@@ -134,54 +208,59 @@ def plot_latency_timeseries(all_results: List[Tuple[pd.DataFrame, Dict[str, Any]
             
         if duration_col not in df.columns:
             continue
-            
-        # Sort by start time to get proper sequence
-        df_sorted = df.sort_values('startTime').reset_index(drop=True)
-        df_sorted['request_index'] = range(len(df_sorted))
         
-        # Calculate 1-second rolling average
-        # Estimate requests per second and use that as window size
-        total_duration_seconds = (df_sorted['startTime'].iloc[-1] - df_sorted['startTime'].iloc[0]).total_seconds()
-        requests_per_second = len(df_sorted) / max(total_duration_seconds, 1)
-        rolling_window = max(int(requests_per_second), 50)  # At least 50 requests for small datasets
+        # Apply benchmark filtering (remove first 4min and last 1min)
+        df_filtered = apply_benchmark_filtering(df)
         
-        # Apply rolling average
-        df_sorted[f'{duration_col}_rolling'] = df_sorted[duration_col].rolling(
-            window=rolling_window, center=True, min_periods=1
-        ).mean()
+        if df_filtered.empty:
+            print(f"✗ No data remaining after filtering for {metadata.get('filename', 'unknown')}")
+            continue
         
-        # Create the plot
-        plt.figure(figsize=(12, 6))
-        plt.plot(df_sorted['request_index'], df_sorted[f'{duration_col}_rolling'], 
-                alpha=0.8, linewidth=1.5, color='blue')
+        # Remove zero or negative durations
+        valid_durations = df_filtered[df_filtered[duration_col] > 0][duration_col]
         
-        # Add 10k request marker if we have enough data
-        if len(df_sorted) >= 10000:
-            plt.axvline(x=10000, color='red', linestyle='--', linewidth=2, 
-                       label='10,000th request', alpha=0.8)
-            plt.legend()
+        if valid_durations.empty:
+            print(f"✗ No valid durations for {metadata.get('filename', 'unknown')}")
+            continue
+        
+        # Create the distribution plot
+        plt.figure(figsize=(12, 8))
+        
+        # Create histogram with KDE overlay
+        sns.histplot(data=valid_durations, kde=True, alpha=0.6, color='skyblue', edgecolor='black')
+        
+        # Use log scale for better visualization of wide ranges
+        plt.xscale('log')
+        
+        # Add statistical markers
+        median_val = valid_durations.median()
+        p95_val = valid_durations.quantile(0.95)
+        
+        plt.axvline(median_val, color='red', linestyle='-', linewidth=2, alpha=0.8, label=f'Median: {median_val:.1f}ms')
+        plt.axvline(p95_val, color='orange', linestyle='--', linewidth=2, alpha=0.8, label=f'95th %ile: {p95_val:.1f}ms')
         
         # Formatting
         db_type = metadata.get('db_type', 'Unknown')
         cluster_size = metadata.get('cluster_size', 'Unknown')
         workers = metadata.get('workers', 'Unknown')
         
-        plt.title(f'{title_prefix} Latency Over Time (1s Rolling Average)\n{db_type} (c{cluster_size}, {workers}w)')
-        plt.xlabel('Request Index')
-        plt.ylabel(f'{title_prefix} Duration (ms)')
+        plt.title(f'{title_prefix} Latency Distribution (Filtered)\n{db_type} (c{cluster_size}, {workers}w)')
+        plt.xlabel(f'{title_prefix} Duration (ms)')
+        plt.ylabel('Frequency')
         plt.grid(True, alpha=0.3)
+        plt.legend()
         
         # Save plot with descriptive filename
         operation = metadata.get("operation", "unknown")
-        db_type = metadata.get("db_type", "unknown")
+        db_type_safe = metadata.get("db_type", "unknown")
         cluster_size = metadata.get("cluster_size", "unknown")
         workers = metadata.get("workers", "unknown")
         
-        filename_safe = f"latency_timeseries_{operation}_{db_type}_c{cluster_size}_{workers}w.pdf"
+        filename_safe = f"latency_distribution_{operation}_{db_type_safe}_c{cluster_size}_{workers}w.pdf"
         plt.savefig(output_dir / filename_safe, bbox_inches='tight')
         plt.close()
         
-        print(f"✓ Created latency plot: {filename_safe}")
+        print(f"✓ Created latency distribution plot: {filename_safe}")
 
 def create_query_comparison_boxplots(all_results: List[Tuple[pd.DataFrame, Dict[str, Any]]], output_dir: Path) -> None:
     """Create comparative box plots for query performance across databases and cluster sizes."""
@@ -230,7 +309,12 @@ def create_query_comparison_boxplots(all_results: List[Tuple[pd.DataFrame, Dict[
                     
                     template_df = df[df['templateName'] == template]
                     if not template_df.empty:
-                        template_data.extend(template_df['queryDurationMs'].tolist())
+                        # Apply benchmark filtering to box plot data
+                        template_df_filtered = apply_benchmark_filtering(template_df)
+                        if not template_df_filtered.empty:
+                            # Remove zero or negative durations
+                            valid_durations = template_df_filtered[template_df_filtered['queryDurationMs'] > 0]['queryDurationMs']
+                            template_data.extend(valid_durations.tolist())
             
             if template_data:
                 plot_data.append(template_data)
@@ -312,22 +396,38 @@ def analyze_all_results(all_results: List[Tuple[pd.DataFrame, Dict[str, Any]]], 
     
     print(f"  Database configurations: {', '.join(sorted(db_configs))}")
     
+    # Generate and display insert performance table
+    print(f"\n" + "=" * 80)
+    print("INSERT PERFORMANCE SUMMARY TABLE")
+    print("=" * 80)
+    
+    insert_table = create_insert_performance_table(all_results)
+    if not insert_table.empty:
+        print(insert_table.to_string(index=False))
+        
+        # Save table to CSV file
+        table_output_file = output_dir / "insert_performance_summary.csv"
+        insert_table.to_csv(table_output_file, index=False)
+        print(f"\n💾 Insert performance table saved to: {table_output_file}")
+    else:
+        print("No insert data found for table generation")
+    
     print(f"\nGenerating visualizations...")
     
     # Create plots directory
     plots_dir = output_dir / "plots"
     plots_dir.mkdir(exist_ok=True)
     
-    # Generate latency time-series plots
-    print(f"\n📊 Creating latency time-series plots...")
-    plot_latency_timeseries(all_results, plots_dir / "latency_timeseries")
+    # Generate latency distribution plots
+    print(f"\n📊 Creating latency distribution plots...")
+    plot_latency_distributions(all_results, plots_dir / "latency_distributions")
     
     # Generate query comparison box plots
     print(f"\n📊 Creating query performance comparison box plots...")
     create_query_comparison_boxplots(all_results, plots_dir / "query_comparisons")
     
     print(f"\n✅ Analysis complete! Check the plots in: {plots_dir}")
-    print(f"   - Latency time-series: {plots_dir / 'latency_timeseries'}")
+    print(f"   - Latency distributions: {plots_dir / 'latency_distributions'}")
     print(f"   - Query comparisons: {plots_dir / 'query_comparisons'}")
     
     # Individual file statistics
