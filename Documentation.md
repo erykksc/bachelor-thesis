@@ -18,6 +18,15 @@ tofu apply -var "node_count=3" -auto-approve
 az aks get-credentials --resource-group benchmark-rg --name benchmark-aks-cluster
 ```
 
+Follow the instructions to install cratedb operator
+[CrateDB-Docs](https://cratedb.com/docs/guide/install/container/kubernetes/kubernetes-operator.html)
+
+```bash
+helm repo add crate-operator https://crate.github.io/crate-operator
+kubectl create namespace crate-operator
+helm install crate-operator crate-operator/crate-operator --namespace crate-operator --set env.CRATEDB_OPERATOR_DEBUG_VOLUME_STORAGE_CLASS=my-azure-storageclass
+```
+
 ## Setup the load generator VM
 
 NOTE: wait a bit after deploying the load-generator as the initialization script is being run (5 min should be enough).
@@ -25,7 +34,7 @@ NOTE: wait a bit after deploying the load-generator as the initialization script
 ```bash
 export LOAD_GENERATOR_IP={IP-OBTAINED-FROM-DEPLOYMENT}
 # git is being synced in order for the nix to ignore the dataset files when entering nix develop
-rsync -avh --progress --exclude 'dataset-generator/.venv' --exclude 'dataset-generator/cache' --exclude 'load-generator/results' \
+rsync -avh --progress --exclude 'escooter-trips-generator/.venv' --exclude 'escooter-trips-generator/cache' --exclude 'load-generator/results' \
    ./dataset-generator ./load-generator ./flake.* ./.gitignore ./.git \
    "azureuser@$LOAD_GENERATOR_IP:/mnt/data/ba/"
 ```

@@ -76,9 +76,9 @@ func main() {
 	var (
 		dbTargetStr     = flag.String("dbTarget", "cratedb", "Target database: cratedb or mobilitydbc")
 		connString      = flag.String("db", "postgresql://crate:crate@localhost:5432/doc", "Connection string to use to connect to db")
-		localitiesPath  = flag.String("localities", "../dataset-generator/output/berlin-localities.geojson", "Path to a file containing localities")
-		poisPath        = flag.String("pois", "../dataset-generator/output/berlin-pois.csv", "Path to a file containing POIs")
-		tripsPath       = flag.String("trips", "../dataset-generator/output/escooter-trips-small.csv", "Path to a CSV file containing the escooter trip events")
+		localitiesPath  = flag.String("localities", "../escooter-trips-generator/output/berlin-localities.geojson", "Path to a file containing localities")
+		poisPath        = flag.String("pois", "../escooter-trips-generator/output/berlin-pois.csv", "Path to a file containing POIs")
+		tripsPath       = flag.String("trips", "../escooter-trips-generator/output/escooter-trips-small.csv", "Path to a CSV file containing the escooter trip events")
 		migrationsDir   = flag.String("migrations", "./migrations", "Directory containing migration files")
 		mode            = flag.String("mode", "insert", "Mode: insert, query, init")
 		numWorkers      = flag.Int("nworkers", 24, "Number of simultanious workers for the benchmark to use")

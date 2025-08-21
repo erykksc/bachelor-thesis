@@ -10,7 +10,7 @@ NWORKERS=16
 NWORKERS_COMPLEX=4
 NCOMPLEX_QUERIES=100000000000 # 100 billion queries, it should be impossible to perform so that the timeout is reached
 NSIMPLE_QUERIES=100000000000 # 100 billion queries
-TRIPS='../dataset-generator/output/escooter-trips-large.csv'
+TRIPS='../escooter-trips-generator/output/escooter-trips-large.csv'
 QRS_TIMEOUT='25m'
 WAIT_BETWEEN_STEPS=180
 
