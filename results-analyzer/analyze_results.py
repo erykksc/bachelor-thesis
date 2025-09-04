@@ -159,38 +159,159 @@ def create_insert_performance_table(all_results: List[Tuple[pd.DataFrame, Dict[s
         
         # Calculate metrics
         if 'insertDurationMs' in df_filtered.columns:
-            # Success rate calculation
+            # Calculate actual benchmark elapsed time
+            benchmark_start = df_filtered['startTime'].min()
+            benchmark_end = df_filtered['endTime'].max()
+            total_elapsed_time_seconds = (benchmark_end - benchmark_start).total_seconds()
+            
+            # Success rate calculation (check for failed inserts)
             total_operations = len(df_filtered)
-            successful_operations = len(df_filtered[df_filtered['insertDurationMs'] > 0])
+            if 'failedInserts' in df_filtered.columns:
+                successful_operations = len(df_filtered[df_filtered['failedInserts'] == 0])
+            else:
+                successful_operations = len(df_filtered[df_filtered['insertDurationMs'] > 0])
             success_rate = (successful_operations / total_operations * 100) if total_operations > 0 else 0
             
             # Duration statistics (only for successful operations)
-            valid_durations = df_filtered[df_filtered['insertDurationMs'] > 0]['insertDurationMs']
+            if 'failedInserts' in df_filtered.columns:
+                valid_durations = df_filtered[df_filtered['failedInserts'] == 0]['insertDurationMs']
+            else:
+                valid_durations = df_filtered[df_filtered['insertDurationMs'] > 0]['insertDurationMs']
+                
             if not valid_durations.empty:
-                total_duration = valid_durations.sum()
                 std_deviation = valid_durations.std()
                 mean_duration = valid_durations.mean()
             else:
-                total_duration = 0
                 std_deviation = 0
                 mean_duration = 0
             
             # Total records inserted
             total_records = df_filtered['successfullyInserted'].sum() if 'successfullyInserted' in df_filtered.columns else 0
             
+            # Calculate throughput (records per second) using actual elapsed time and total records inserted
+            throughput = (total_records / total_elapsed_time_seconds) if total_elapsed_time_seconds > 0 else 0
+            
             table_data.append({
                 'Database': database,
                 'Cluster Size': f'c{cluster_size}',
                 'Workers': workers,
                 'Success Rate (%)': f'{success_rate:.1f}',
-                'Total Duration (s)': f'{total_duration/1000:.1f}',
+                'Total Duration (s)': f'{total_elapsed_time_seconds:.1f}',
                 'Mean Duration (ms)': f'{mean_duration:.1f}',
                 'Std Deviation (ms)': f'{std_deviation:.1f}',
+                'Throughput (records/s)': f'{throughput:.0f}',
                 'Total Records': f'{total_records:,}',
                 'Operations': total_operations
             })
     
     return pd.DataFrame(table_data)
+
+def create_query_performance_table(all_results: List[Tuple[pd.DataFrame, Dict[str, Any]]], query_complexity: str) -> pd.DataFrame:
+    """Create a summary table for query performance metrics (simple or complex)."""
+    query_results = [(df, meta) for df, meta in all_results if meta["operation"] == "query"]
+    
+    if not query_results:
+        return pd.DataFrame()
+    
+    # Filter for specific query complexity
+    filtered_results = []
+    for df, meta in query_results:
+        query_type = meta.get('query_type', '').lower()
+        if query_complexity.lower() in query_type:
+            filtered_results.append((df, meta))
+    
+    if not filtered_results:
+        return pd.DataFrame()
+    
+    table_data = []
+    
+    for df, metadata in filtered_results:
+        # Apply benchmark filtering
+        df_filtered = apply_benchmark_filtering(df)
+        
+        if df_filtered.empty:
+            continue
+            
+        # Extract metadata
+        database = metadata.get('db_type', 'Unknown')
+        cluster_size = metadata.get('cluster_size', 'Unknown')
+        workers = metadata.get('workers', 'Unknown')
+        
+        # Calculate metrics
+        if 'queryDurationMs' in df_filtered.columns:
+            # Calculate actual benchmark elapsed time
+            benchmark_start = df_filtered['startTime'].min()
+            benchmark_end = df_filtered['endTime'].max()
+            total_elapsed_time_seconds = (benchmark_end - benchmark_start).total_seconds()
+            
+            # Success rate calculation (based on 'successful' column if available, otherwise non-zero duration)
+            total_operations = len(df_filtered)
+            if 'successful' in df_filtered.columns:
+                successful_operations = df_filtered['successful'].sum()
+            else:
+                successful_operations = len(df_filtered[df_filtered['queryDurationMs'] > 0])
+            success_rate = (successful_operations / total_operations * 100) if total_operations > 0 else 0
+            
+            # Duration statistics (only for successful operations)
+            if 'successful' in df_filtered.columns:
+                valid_durations = df_filtered[df_filtered['successful'] == True]['queryDurationMs']
+            else:
+                valid_durations = df_filtered[df_filtered['queryDurationMs'] > 0]['queryDurationMs']
+                
+            if not valid_durations.empty:
+                std_deviation = valid_durations.std()
+                mean_duration = valid_durations.mean()
+                median_duration = valid_durations.median()
+            else:
+                std_deviation = 0
+                mean_duration = 0
+                median_duration = 0
+            
+            # Total queries executed
+            total_queries = total_operations
+            
+            # Calculate throughput (queries per second) using actual elapsed time
+            throughput = (successful_operations / total_elapsed_time_seconds) if total_elapsed_time_seconds > 0 else 0
+            
+            table_data.append({
+                'Database': database,
+                'Cluster Size': f'c{cluster_size}',
+                'Workers': workers,
+                'Success Rate (%)': f'{success_rate:.1f}',
+                'Total Duration (s)': f'{total_elapsed_time_seconds:.1f}',
+                'Mean Duration (ms)': f'{mean_duration:.1f}',
+                'Median Duration (ms)': f'{median_duration:.1f}',
+                'Std Deviation (ms)': f'{std_deviation:.1f}',
+                'Throughput (queries/s)': f'{throughput:.1f}',
+                'Total Queries': f'{total_queries:,}',
+                'Successful Queries': f'{successful_operations:,}'
+            })
+    
+    return pd.DataFrame(table_data)
+
+def create_simple_query_performance_table(all_results: List[Tuple[pd.DataFrame, Dict[str, Any]]]) -> pd.DataFrame:
+    """Create a summary table for simple query performance metrics."""
+    return create_query_performance_table(all_results, "simple")
+
+def create_complex_query_performance_table(all_results: List[Tuple[pd.DataFrame, Dict[str, Any]]]) -> pd.DataFrame:
+    """Create a summary table for complex query performance metrics."""
+    table = create_query_performance_table(all_results, "complex")
+    
+    # Convert throughput to queries per 100 seconds for complex queries
+    if not table.empty and 'Throughput (queries/s)' in table.columns:
+        # Parse the throughput values, multiply by 100, and reformat
+        def convert_throughput(throughput_str):
+            try:
+                value = float(throughput_str)
+                return f'{value * 100:.2f}'
+            except:
+                return throughput_str
+        
+        table['Throughput (queries/100s)'] = table['Throughput (queries/s)'].apply(convert_throughput)
+        # Remove the old column
+        table = table.drop('Throughput (queries/s)', axis=1)
+    
+    return table
 
 def plot_latency_distributions(all_results: List[Tuple[pd.DataFrame, Dict[str, Any]]], output_dir: Path) -> None:
     """Create latency distribution plots for each result file."""
@@ -226,6 +347,9 @@ def plot_latency_distributions(all_results: List[Tuple[pd.DataFrame, Dict[str, A
         # Create the distribution plot
         plt.figure(figsize=(12, 8))
         
+        # Set font size for all plot elements
+        plt.rcParams.update({'font.size': 14})
+        
         # Create histogram with KDE overlay
         sns.histplot(data=valid_durations, kde=True, alpha=0.6, color='skyblue', edgecolor='black')
         
@@ -244,11 +368,11 @@ def plot_latency_distributions(all_results: List[Tuple[pd.DataFrame, Dict[str, A
         cluster_size = metadata.get('cluster_size', 'Unknown')
         workers = metadata.get('workers', 'Unknown')
         
-        plt.title(f'{title_prefix} Latency Distribution (Filtered)\n{db_type} (c{cluster_size}, {workers}w)')
-        plt.xlabel(f'{title_prefix} Duration (ms)')
-        plt.ylabel('Frequency')
+        # plt.title(f'{title_prefix} Latency Distribution (Filtered)\n{db_type} (c{cluster_size}, {workers}w)')
+        plt.xlabel(f'{title_prefix} Duration (ms)', fontsize=14)
+        plt.ylabel('Frequency', fontsize=14)
         plt.grid(True, alpha=0.3)
-        plt.legend()
+        plt.legend(fontsize=14)
         
         # Save plot with descriptive filename
         operation = metadata.get("operation", "unknown")
@@ -281,6 +405,8 @@ def create_query_comparison_boxplots(all_results: List[Tuple[pd.DataFrame, Dict[
     
     for template in query_templates:
         plt.figure(figsize=(15, 10))
+        # Set font size for all plot elements
+        plt.rcParams.update({'font.size': 14})
         
         # Collect all unique configurations for this template
         template_configs = set()
@@ -324,6 +450,9 @@ def create_query_comparison_boxplots(all_results: List[Tuple[pd.DataFrame, Dict[
                 legend_labels.append(f'{db_type} c{cluster_size} ({workers}w)')
         
         if len(plot_data) >= 2:  # Only create plot if we have data from multiple configs
+            # Set font size for all plot elements
+            plt.rcParams.update({'font.size': 14})
+            
             # Create box plot
             box_plot = plt.boxplot(plot_data, tick_labels=plot_labels, patch_artist=True)
             
@@ -335,18 +464,18 @@ def create_query_comparison_boxplots(all_results: List[Tuple[pd.DataFrame, Dict[
                 # Add slight transparency to distinguish overlapping configs
                 patch.set_alpha(0.8)
             
-            plt.title(f'Query Performance Comparison: {template}')
-            plt.xlabel('Database Configuration')
-            plt.ylabel('Query Duration (ms)')
+            # plt.title(f'Query Performance Comparison: {template}')
+            plt.xlabel('Database Configuration', fontsize=14)
+            plt.ylabel('Query Duration (ms)', fontsize=14)
             plt.yscale('log')  # Use log scale for better visualization of wide ranges
             plt.grid(True, alpha=0.3)
-            plt.xticks(rotation=45)
+            plt.xticks(rotation=45, fontsize=14)
             
             # Add legend
             legend_patches = [plt.Rectangle((0,0),1,1, facecolor=colors[i], alpha=0.8) 
                             for i in range(len(legend_labels))]
             plt.legend(legend_patches, legend_labels, 
-                      loc='upper left', bbox_to_anchor=(1, 1))
+                      loc='upper left', bbox_to_anchor=(1, 1), fontsize=14)
             
             # Determine if this is simple or complex queries based on metadata
             query_complexity = "unknown"
@@ -411,6 +540,38 @@ def analyze_all_results(all_results: List[Tuple[pd.DataFrame, Dict[str, Any]]], 
         print(f"\n💾 Insert performance table saved to: {table_output_file}")
     else:
         print("No insert data found for table generation")
+    
+    # Generate and display simple query performance table
+    print(f"\n" + "=" * 80)
+    print("SIMPLE QUERY PERFORMANCE SUMMARY TABLE")
+    print("=" * 80)
+    
+    simple_query_table = create_simple_query_performance_table(all_results)
+    if not simple_query_table.empty:
+        print(simple_query_table.to_string(index=False))
+        
+        # Save table to CSV file
+        simple_table_output_file = output_dir / "simple_query_performance_summary.csv"
+        simple_query_table.to_csv(simple_table_output_file, index=False)
+        print(f"\n💾 Simple query performance table saved to: {simple_table_output_file}")
+    else:
+        print("No simple query data found for table generation")
+    
+    # Generate and display complex query performance table
+    print(f"\n" + "=" * 80)
+    print("COMPLEX QUERY PERFORMANCE SUMMARY TABLE")
+    print("=" * 80)
+    
+    complex_query_table = create_complex_query_performance_table(all_results)
+    if not complex_query_table.empty:
+        print(complex_query_table.to_string(index=False))
+        
+        # Save table to CSV file
+        complex_table_output_file = output_dir / "complex_query_performance_summary.csv"
+        complex_query_table.to_csv(complex_table_output_file, index=False)
+        print(f"\n💾 Complex query performance table saved to: {complex_table_output_file}")
+    else:
+        print("No complex query data found for table generation")
     
     print(f"\nGenerating visualizations...")
     
