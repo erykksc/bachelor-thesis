@@ -2,9 +2,9 @@
 .nix-profile
 .direnv/
 .envrc
-dataset-generator/output/
-dataset-generator/.venv/
-dataset-generator/cache/
+escooter-trips-generator/output/
+escooter-trips-generator/.venv/
+escooter-trips-generator/cache/
 
 # Terraform/ opentofu
 *.tfstate

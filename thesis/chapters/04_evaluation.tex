@@ -238,7 +238,7 @@ Individual worker nodes of MobilityDBC need to be manually connected to the coor
 For this job, we developed a Manager, a Docker container which when added to the Kubernetes cluster with right permissions, automatically detects new pods running Citus workers and connects them to the Coordinator.
 We also published the images to GHCR under MIT License.\footnote{\url{https://github.com/erykksc/citus-k8s-manager}}
 CrateDB clusters do not require such manager as the nodes support auto discovery and elect the master node themselves.\footnote{\url{https://cratedb.com/docs/guide/admin/clustering/multi-node-setup.html}}
-We created two Helm charts in order to simplify the deployment of the DDBMS, one for CrateDB and one for MobilityDB. \footnote{\url{[GITHUB REPO URL]}}
+We created two Helm charts in order to simplify the deployment of the DDBMS, one for CrateDB and one for MobilityDB.
 Using Helm charts we are able to deploy a collection of Kubernetes deployments such as stateful sets with the nodes, internal and external services, storage classes required to run DDBMS.
 We choose Helm charts as they allow parametrization using templating, so change of Storage Class or number of nodes in cluster can be changed using a CLI argument.
 Kubernetes by itself does not support this feature and relies on external tools, such as Helm.
@@ -278,7 +278,7 @@ To put it differently, we list the provisioned resources in \cref{tab:node-resou
 
 \subsubsection{Benchmark Run}
 
-Next, we configure the load-generator using our initialization scripts\footnote{\url{GITHUB_REPO}}.
+Next, we configure the load-generator using our initialization scripts.
 Afterwards, we deploy the DDBMS using helm charts we defined and monitor the deployment to ensure each worker and coordinator runs on a separate AKS-Cluster node.
 Then, we check if the DDBMS is in a healthy state, through Citus commands for MobilityDBC and Web interface for CrateDB (CrateDB provides a built in web interface).
 

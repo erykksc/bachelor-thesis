@@ -36,11 +36,10 @@ We have identified the following requirements for our benchmark:
 We decided that the benchmark runs in the cloud because of the two reasons.
 First, we lacked access to multiple local machines with identical hardware, making resource heterogeneity a concern.
 Second, a Cloud based deployment improves repeatability, as others can reproduce our setup without buying dedicated hardware, meeting part of our repeatability requirement \ref{req:reproducible-repeatable}.
-[CITATION]
 Moreover, cloud deployments of distributed databases reflect real-world use cases, making the benchmark more relevant, matching our relevancy requirement \ref{req:relevant}.
 
 % infrastructure as code to allow reproducibility
-To match the requirement \ref{req:reproducible-repeatable} of reproducibility and repeatability, all parts of the benchmark, including cloud resource definitions and software configuration, are expressed in code\footnote{\url{[GITHUB-REPO]}}.
+To match the requirement \ref{req:reproducible-repeatable} of reproducibility and repeatability, all parts of the benchmark, including cloud resource definitions and software configuration, are expressed in code.
 Using infrastructure as code allows multiple benchmark runs with the exact same configuration eliminating the risk of manual misconfiguration, ensuring repeatability in requirement \ref{req:reproducible-repeatable}.
 Additionally, systems having access to the identical resources make the benchmark and comparison of the systems fair, matching requirement \ref{req:fair}.
 

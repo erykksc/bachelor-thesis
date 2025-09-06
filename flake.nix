@@ -30,6 +30,7 @@
             pkgs.opentofu
             pkgs.postgresql_17
             pkgs.tectonic
+            pkgs.tex-fmt
             pkgs.uv
           ];
         };
